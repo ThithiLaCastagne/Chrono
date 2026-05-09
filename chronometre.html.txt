@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Chrono">
+<title>Chronomètre</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body {
+  background: #000;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  height: 100%;
+  overflow: hidden;
+  color: #fff;
+}
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 400px;
+  margin: 0 auto;
+  background: #000;
+}
+
+/* STATUS BAR */
+.status-bar {
+  background: #000;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* MAIN CONTENT */
+.view { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+.view.active { display: flex; }
+
+/* ---- CHRONO VIEW ---- */
+.chrono-top {
+  background: #000;
+  padding: 6px 0 0;
+  flex-shrink: 0;
+}
+.time-mini {
+  text-align: center;
+  font-size: 18px;
+  color: #888;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  padding: 4px 0;
+}
+.time-big {
+  text-align: center;
+  font-size: 68px;
+  color: #fff;
+  font-weight: 100;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -3px;
+  line-height: 1;
+  padding: 4px 0 14px;
+}
+.btn-row {
+  display: flex;
+  gap: 12px;
+  padding: 0 16px 14px;
+}
+.btn-ios {
+  flex: 1;
+  height: 48px;
+  border-radius: 9px;
+  font-size: 19px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  color: #fff;
+  text-shadow: 0 -1px 1px rgba(0,0,0,0.6);
+  position: relative;
+  overflow: hidden;
+  -webkit-appearance: none;
+}
+.btn-ios::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 50%;
+  background: rgba(255,255,255,0.20);
+  border-radius: 9px 9px 0 0;
+  pointer-events: none;
+}
+.btn-red   { background: linear-gradient(#e03030, #a01818); border: 1px solid #7a1010; }
+.btn-green { background: linear-gradient(#4caa4c, #2a7a2a); border: 1px solid #1a5a1a; }
+.btn-gray  { background: linear-gradient(#888, #555);        border: 1px solid #3a3a3a; }
+.btn-ios:active { opacity: 0.75; transform: scale(0.98); }
+
+.laps-area {
+  flex: 1;
+  overflow-y: auto;
+  background: #c8c8c8;
+  border-top: 1px solid #999;
+  -webkit-overflow-scrolling: touch;
+}
+.lap-empty {
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+  padding: 28px 0;
+}
+.lap-row {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid #aaa;
+  font-size: 15px;
+}
+.lap-row:nth-child(odd)  { background: #d2d2d2; }
+.lap-row:nth-child(even) { background: #bebebe; }
+.lap-label { color: #333; }
+.lap-time  { font-variant-numeric: tabular-nums; font-weight: 500; color: #111; }
+
+/* ---- MULTI VIEW ---- */
+.multi-header {
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+  padding: 10px 14px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+.multi-title { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+.btn-new {
+  background: none; border: none; color: #5ac85a;
+  font-size: 13px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px;
+  padding: 4px 0;
+}
+
+.chrono-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #000;
+}
+.chrono-item {
+  border-bottom: 1px solid #1e1e1e;
+  padding: 12px 14px 8px;
+}
+.ci-name {
+  font-size: 10px; color: #666;
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;
+}
+.ci-time {
+  font-size: 42px; font-weight: 100; color: #fff;
+  letter-spacing: -1.5px; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.ci-sub  { font-size: 11px; color: #5ac85a; margin-top: 3px; }
+.ci-since{ font-size: 10px; color: #444; margin-top: 1px; }
+.ci-del  {
+  margin-top: 7px; background: #1e0000; border: 1px solid #5a1a1a;
+  border-radius: 10px; color: #e05555; font-size: 10px;
+  padding: 3px 12px; cursor: pointer; -webkit-appearance: none;
+}
+.ci-del:active { opacity: 0.7; }
+.multi-empty {
+  text-align: center; color: #444; font-size: 13px; padding: 50px 20px;
+  line-height: 1.6;
+}
+
+/* ADD FORM */
+.add-form {
+  background: #111;
+  border-top: 1px solid #2a2a2a;
+  padding: 12px 14px;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.add-form.open { display: flex; }
+.add-form input {
+  background: #0a0a0a;
+  border: 1px solid #333;
+  border-radius: 7px;
+  color: #fff;
+  font-size: 14px;
+  padding: 9px 11px;
+  width: 100%;
+  font-family: inherit;
+  -webkit-appearance: none;
+}
+.add-form input:focus { outline: none; border-color: #5ac85a; }
+.add-form-btns { display: flex; gap: 8px; }
+.btn-form-cancel {
+  flex: 1; padding: 8px; border-radius: 7px; font-size: 13px;
+  background: #222; border: 1px solid #444; color: #888; cursor: pointer; -webkit-appearance: none;
+}
+.btn-form-ok {
+  flex: 2; padding: 8px; border-radius: 7px; font-size: 13px;
+  background: #1a3a1a; border: 1px solid #5ac85a; color: #5ac85a; cursor: pointer; -webkit-appearance: none;
+  font-weight: 600;
+}
+.btn-form-cancel:active, .btn-form-ok:active { opacity: 0.7; }
+
+/* NAV BAR */
+.nav-bar {
+  background: #1a1a1a;
+  border-top: 1px solid #3a3a3a;
+  height: 49px;
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 2px; font-size: 9px; color: #666; cursor: pointer;
+  padding-bottom: 3px; border: none; background: none; -webkit-appearance: none;
+}
+.nav-item.active { color: #fff; }
+.nav-icon { font-size: 22px; line-height: 1; }
+</style>
+</head>
+<body>
+<div class="screen">
+
+  <!-- STATUS BAR -->
+  <div class="status-bar">
+    <span id="sb-time">00:00</span>
+    <span>Chrono</span>
+    <span>&#9646;&#9646;&#9646;</span>
+  </div>
+
+  <!-- VIEW : CHRONOMETRE CLASSIQUE -->
+  <div class="view active" id="view-chrono">
+    <div class="chrono-top">
+      <div class="time-mini" id="time-mini">00:00:00.0</div>
+      <div class="time-big"  id="time-big">00:00:00.0</div>
+      <div class="btn-row">
+        <button class="btn-ios btn-green" id="btn-main" onclick="mainAction()">Démarrer</button>
+        <button class="btn-ios btn-gray"  id="btn-sec"  onclick="secAction()">Tour</button>
+      </div>
+    </div>
+    <div class="laps-area" id="laps-area">
+      <div class="lap-empty">Aucun tour</div>
+    </div>
+  </div>
+
+  <!-- VIEW : MULTI CHRONOMÈTRES -->
+  <div class="view" id="view-multi">
+    <div class="multi-header">
+      <span class="multi-title">Mes chronomètres</span>
+      <button class="btn-new" onclick="openAdd()">+ Nouveau</button>
+    </div>
+    <div class="chrono-scroll" id="chrono-cards"></div>
+    <div class="add-form" id="add-form">
+      <input type="text" id="inp-name" placeholder="Nom (ex : Avec Sophie)" maxlength="32" />
+      <input type="datetime-local" id="inp-dt" />
+      <div class="add-form-btns">
+        <button class="btn-form-cancel" onclick="closeAdd()">Annuler</button>
+        <button class="btn-form-ok"     onclick="addChrono()">Démarrer depuis cette date</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAV BAR -->
+  <div class="nav-bar">
+    <button class="nav-item" onclick="switchTab('chrono')">
+      <span class="nav-icon">&#9201;</span>
+      <span>Chrono</span>
+    </button>
+    <button class="nav-item active" id="tab-multi" onclick="switchTab('multi')">
+      <span class="nav-icon">&#8987;</span>
+      <span>Multi</span>
+    </button>
+  </div>
+
+</div>
+
+<script>
+/* =========================================
+   CHRONOMÈTRE CLASSIQUE
+   ========================================= */
+var running = false, startTime = 0, elapsed = 0, rafId = null, lapStart = 0, laps = [];
+
+function pad(n, d) { return String(Math.floor(n)).padStart(d || 2, '0'); }
+
+function fmtMs(ms) {
+  var s  = Math.floor(ms / 1000);
+  var h  = Math.floor(s / 3600);
+  var m  = Math.floor((s % 3600) / 60);
+  var sc = s % 60;
+  var t  = Math.floor((ms % 1000) / 100);
+  return pad(h) + ':' + pad(m) + ':' + pad(sc) + '.' + t;
+}
+
+function mainAction() {
+  if (!running) {
+    running   = true;
+    startTime = Date.now() - elapsed;
+    lapStart  = startTime;
+    document.getElementById('btn-main').textContent = 'Arrêter';
+    document.getElementById('btn-main').className   = 'btn-ios btn-red';
+    document.getElementById('btn-sec').textContent  = 'Tour';
+    tickChrono();
+  } else {
+    running = false;
+    cancelAnimationFrame(rafId);
+    elapsed = Date.now() - startTime;
+    document.getElementById('btn-main').textContent = 'Démarrer';
+    document.getElementById('btn-main').className   = 'btn-ios btn-green';
+    document.getElementById('btn-sec').textContent  = 'Réinitialiser';
+  }
+}
+
+function secAction() {
+  if (running) {
+    var now = Date.now();
+    laps.unshift({ n: laps.length + 1, t: fmtMs(now - lapStart) });
+    lapStart = now;
+    renderLaps();
+  } else if (elapsed > 0) {
+    elapsed = 0; laps = [];
+    document.getElementById('time-big').textContent  = '00:00:00.0';
+    document.getElementById('time-mini').textContent = '00:00:00.0';
+    document.getElementById('btn-sec').textContent   = 'Tour';
+    renderLaps();
+  }
+}
+
+function tickChrono() {
+  var ms = Date.now() - startTime;
+  var s  = fmtMs(ms);
+  document.getElementById('time-big').textContent  = s;
+  document.getElementById('time-mini').textContent = s;
+  if (running) rafId = requestAnimationFrame(tickChrono);
+}
+
+function renderLaps() {
+  var el = document.getElementById('laps-area');
+  if (!laps.length) { el.innerHTML = '<div class="lap-empty">Aucun tour</div>'; return; }
+  el.innerHTML = laps.map(function(l) {
+    return '<div class="lap-row"><span class="lap-label">Tour ' + l.n + '</span><span class="lap-time">' + l.t + '</span></div>';
+  }).join('');
+}
+
+/* =========================================
+   MULTI CHRONOMÈTRES
+   ========================================= */
+var chronos = [];
+try { chronos = JSON.parse(localStorage.getItem('ck_chronos') || '[]'); } catch(e) {}
+
+function save() { try { localStorage.setItem('ck_chronos', JSON.stringify(chronos)); } catch(e) {} }
+
+function pad2(n) { return String(Math.floor(n)).padStart(2, '0'); }
+
+function fmtElapsed(ms) {
+  var s  = Math.floor(Math.max(0, ms) / 1000);
+  var yr = Math.floor(s / 31557600);
+  var mo = Math.floor((s % 31557600) / 2629800);
+  var d  = Math.floor((s % 2629800)  / 86400);
+  var h  = Math.floor((s % 86400)    / 3600);
+  var m  = Math.floor((s % 3600)     / 60);
+  var sc = s % 60;
+  if (yr > 0) return yr + 'a ' + mo + 'm ' + d + 'j';
+  if (mo > 0) return mo + 'm ' + d + 'j ' + pad2(h) + 'h';
+  if (d  > 0) return d  + 'j ' + pad2(h) + ':' + pad2(m) + ':' + pad2(sc);
+  return pad2(h) + ':' + pad2(m) + ':' + pad2(sc);
+}
+
+function fmtSince(iso) {
+  var d = new Date(iso);
+  return 'depuis le ' + d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+    + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderCards() {
+  var el = document.getElementById('chrono-cards');
+  if (!chronos.length) {
+    el.innerHTML = '<div class="multi-empty">Aucun chronomètre.<br>Appuie sur <strong style="color:#5ac85a">+ Nouveau</strong><br>pour en ajouter un.</div>';
+    return;
+  }
+  el.innerHTML = chronos.map(function(c, i) {
+    var ms = Math.max(0, Date.now() - new Date(c.start).getTime());
+    return '<div class="chrono-item">'
+      + '<div class="ci-name">' + c.label + '</div>'
+      + '<div class="ci-time" id="cv' + i + '">' + fmtElapsed(ms) + '</div>'
+      + '<div class="ci-sub"  id="cs' + i + '">' + fmtSince(c.start) + '</div>'
+      + '<button class="ci-del" onclick="delChrono(' + i + ')">Supprimer</button>'
+      + '</div>';
+  }).join('');
+}
+
+function tickCards() {
+  chronos.forEach(function(c, i) {
+    var el = document.getElementById('cv' + i);
+    if (!el) return;
+    el.textContent = fmtElapsed(Math.max(0, Date.now() - new Date(c.start).getTime()));
+  });
+}
+
+function openAdd() {
+  var f = document.getElementById('add-form');
+  f.classList.add('open');
+  var now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('inp-dt').value = now.toISOString().slice(0, 16);
+  document.getElementById('inp-name').focus();
+}
+
+function closeAdd() {
+  document.getElementById('add-form').classList.remove('open');
+}
+
+function addChrono() {
+  var name = document.getElementById('inp-name').value.trim();
+  var dt   = document.getElementById('inp-dt').value;
+  if (!name || !dt) { alert('Remplis le nom et la date !'); return; }
+  chronos.push({ label: name, start: dt });
+  save();
+  renderCards();
+  closeAdd();
+  document.getElementById('inp-name').value = '';
+}
+
+function delChrono(i) {
+  if (!confirm('Supprimer "' + chronos[i].label + '" ?')) return;
+  chronos.splice(i, 1);
+  save();
+  renderCards();
+}
+
+/* =========================================
+   NAVIGATION
+   ========================================= */
+function switchTab(tab) {
+  document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
+  document.querySelectorAll('.nav-item').forEach(function(b) { b.classList.remove('active'); });
+  if (tab === 'chrono') {
+    document.getElementById('view-chrono').classList.add('active');
+    document.querySelectorAll('.nav-item')[0].classList.add('active');
+  } else {
+    document.getElementById('view-multi').classList.add('active');
+    document.getElementById('tab-multi').classList.add('active');
+    renderCards();
+  }
+}
+
+/* =========================================
+   HORLOGE BARRE DE STATUT
+   ========================================= */
+function updateClock() {
+  var now = new Date();
+  document.getElementById('sb-time').textContent =
+    now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/* =========================================
+   INIT
+   ========================================= */
+updateClock();
+setInterval(updateClock, 10000);
+setInterval(tickCards, 1000);
+switchTab('multi');
+</script>
+</body>
+</html>
