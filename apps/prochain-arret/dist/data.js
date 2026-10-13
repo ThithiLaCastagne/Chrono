@@ -14,13 +14,25 @@ export async function searchStations(q,signal) {
   const res=await fetch(url,{signal});if(!res.ok)throw new Error('Le service de recherche est momentanément indisponible. Réessayez ou utilisez les coordonnées.');
   const json=await res.json();return normalizeFeatures(json?.features);
 }
+export const OVERPASS_ENDPOINTS=['https://overpass-api.de/api/interpreter','https://overpass.private.coffee/api/interpreter'];
 async function overpass(query,signal) {
-  const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:new URLSearchParams({data:query}),signal});
-  if(!r.ok)throw new Error('Le réseau de transport ne répond pas pour le moment. Le mode par distance reste disponible.');
-  const j=await r.json();if(!j||!Array.isArray(j.elements)||j.remark&&!j.elements.length)throw new Error('Recherche de ligne indisponible.');return j.elements||[];
+  const message='Le réseau de transport ne répond pas pour le moment. Le mode par distance reste disponible.';
+  for(const endpoint of OVERPASS_ENDPOINTS){
+    if(signal?.aborted)throw new DOMException('Recherche annulée','AbortError');
+    const ac=new AbortController(),abort=()=>ac.abort();signal?.addEventListener('abort',abort,{once:true});const timer=setTimeout(abort,10000);
+    try{
+      const r=await fetch(endpoint,{method:'POST',body:new URLSearchParams({data:query}),signal:ac.signal});
+      // Respect a rate-limit or rejected query: do not route around it.
+      if(r.status===429||(r.status>=400&&r.status<500)){const error=new Error(message);error.noRetry=true;throw error;}
+      if(!r.ok)throw new Error(message);
+      const j=await r.json();if(!j||!Array.isArray(j.elements)||j.remark)throw new Error(message);return j.elements;
+    }catch(e){if(signal?.aborted)throw new DOMException('Recherche annulée','AbortError');if(e.noRetry)throw e;}
+    finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+  }
+  throw new Error(message);
 }
 export async function nearbyStops(p,signal) {
-  const els=await overpass(`[out:json][timeout:18];(nwr(around:1300,${p.lat},${p.lon})[railway~"^(station|halt|tram_stop)$"];node(around:1300,${p.lat},${p.lon})[highway=bus_stop];);out center tags;`,signal);
+  const els=await overpass(`[out:json][timeout:9];(nwr(around:1300,${p.lat},${p.lon})[railway~"^(station|halt|tram_stop)$"];node(around:1300,${p.lat},${p.lon})[highway=bus_stop];);out center tags;`,signal);
   const list=els.filter(e=>e&&typeof e.type==='string').map(e=>({name:clean(e.tags?.name),lat:e.lat??e.center?.lat,lon:e.lon??e.center?.lon,city:'À proximité',kind:e.tags?.railway||'bus_stop',id:e.type[0].toUpperCase()+e.id})).filter(s=>s.name&&validPoint(s));
   const seen=new Set();return list.sort((a,b)=>distance(p,a)-distance(p,b)).filter(s=>{if(seen.has(s.name))return false;seen.add(s.name);return true;}).slice(0,16);
 }
@@ -50,6 +62,6 @@ export function parseRoutes(els,target) {
   return routes.slice(0,20);
 }
 export async function findRoutes(target,signal) {
-  const q=`[out:json][timeout:20];(node(around:350,${target.lat},${target.lon})[public_transport];node(around:350,${target.lat},${target.lon})[railway];node(around:350,${target.lat},${target.lon})[highway=bus_stop];way(around:350,${target.lat},${target.lon})[public_transport=platform];)->.s;rel(bn.s)[type=route][route~"^(bus|tram|subway|train|light_rail)$"]->.n;rel(bw.s)[type=route][route~"^(bus|tram|subway|train|light_rail)$"]->.w;(.n;.w;);out body;>;out body center;`;
+  const q=`[out:json][timeout:9];(node(around:350,${target.lat},${target.lon})[public_transport];node(around:350,${target.lat},${target.lon})[railway];node(around:350,${target.lat},${target.lon})[highway=bus_stop];way(around:350,${target.lat},${target.lon})[public_transport=platform];)->.s;rel(bn.s)[type=route][route~"^(bus|tram|subway|train|light_rail)$"]->.n;rel(bw.s)[type=route][route~"^(bus|tram|subway|train|light_rail)$"]->.w;(.n;.w;);out body;>;out body center;`;
   return parseRoutes(await overpass(q,signal),target);
 }
