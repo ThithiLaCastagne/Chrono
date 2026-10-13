@@ -6,6 +6,7 @@ const w=new Window({url:'https://example.test/',settings:{disableJavaScriptFileL
 w.document.write(readFileSync('dist/index.html','utf8'));
 for(const key of ['window','document','localStorage','location'])globalThis[key]=key==='window'?w:w[key];
 Object.defineProperty(globalThis,'navigator',{value:w.navigator,configurable:true});
+Object.defineProperty(navigator,'vibrate',{value:()=>true,configurable:true});
 Object.defineProperty(navigator,'onLine',{value:true,configurable:true});
 let cleared=false;
 Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition(ok){ok({coords:{latitude:48.87,longitude:2.35,accuracy:10},timestamp:Date.now()})},watchPosition(){return 7},clearWatch(id){cleared=id===7}},configurable:true});

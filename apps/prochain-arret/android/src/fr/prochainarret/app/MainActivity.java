@@ -64,7 +64,8 @@ public class MainActivity extends Activity {
     if(pendingConfig==null)return;
     if(!hasLocation()||!hasNotifications()){List<String> p=new ArrayList<>();if(!hasLocation()){p.add(Manifest.permission.ACCESS_FINE_LOCATION);p.add(Manifest.permission.ACCESS_COARSE_LOCATION);}if(!hasNotifications()&&Build.VERSION.SDK_INT>=33)p.add(Manifest.permission.POST_NOTIFICATIONS);requestPermissions(p.toArray(new String[0]),102);return;}
     NotificationManager nm=getSystemService(NotificationManager.class);
-    if(!nm.areNotificationsEnabled()){pendingConfig=null;error("Les notifications sont désactivées. Activez-les dans les réglages Android avant de démarrer.");return;}
+    JSONObject preferences;try{preferences=new JSONObject(pendingConfig);}catch(Exception e){pendingConfig=null;error("Destination invalide.");return;}
+    if(!TripService.alertsEnabled(this,preferences)){pendingConfig=null;error("Les notifications sont désactivées. Activez-les dans les réglages Android avant de démarrer.");return;}
     android.location.LocationManager lm=getSystemService(android.location.LocationManager.class);
     if(!lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)&&!lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)){pendingConfig=null;error("Activez la localisation du téléphone avant de démarrer.");return;}
     Intent i=new Intent(this,TripService.class).setAction("START").putExtra("config",pendingConfig);pendingConfig=null;
@@ -81,9 +82,9 @@ public class MainActivity extends Activity {
     @JavascriptInterface public void stop(){runOnUiThread(()->{pendingConfig=null;stopService(new Intent(MainActivity.this,TripService.class));getSharedPreferences("trip",0).edit().clear().apply();getSystemService(NotificationManager.class).cancelAll();});}
     @JavascriptInterface public void clear(){stop();}
     @JavascriptInterface public void acknowledge(){runOnUiThread(()->{if(TripService.running)startService(new Intent(MainActivity.this,TripService.class).setAction("ACK"));});}
-    @JavascriptInterface public void test(String preferences){runOnUiThread(()->{try{testPrefs=new JSONObject(preferences);if(!hasNotifications()&&Build.VERSION.SDK_INT>=33){testing=true;requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},103);}else TripService.test(MainActivity.this,testPrefs);}catch(Exception e){error("Test impossible. Vérifiez les autorisations.");}});}
+    @JavascriptInterface public void test(String preferences){runOnUiThread(()->{try{testPrefs=new JSONObject(preferences);if(!hasNotifications()&&Build.VERSION.SDK_INT>=33){testing=true;requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},103);}else if(!TripService.alertsEnabled(MainActivity.this,testPrefs))error("Les alertes sont désactivées dans les réglages Android.");else TripService.test(MainActivity.this,testPrefs);}catch(Exception e){error("Test impossible. Vérifiez les autorisations.");}});}
     @JavascriptInterface public void settings(String type){runOnUiThread(()->{try{Intent i;if("notifications".equals(type)){i=new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName());}else{i=new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName()));}startActivity(i);}catch(Exception ignored){}});}
   }
-  @Override public void onBackPressed(){web.evaluateJavascript("document.querySelector('#modal').open ? document.querySelector('#modal').close() : false",null);if(!TripService.running)super.onBackPressed();else moveTaskToBack(true);}
+  @Override public void onBackPressed(){web.evaluateJavascript("window.closeTopOverlay && window.closeTopOverlay()",closed->{if(!"true".equals(closed)){if(!TripService.running)MainActivity.super.onBackPressed();else moveTaskToBack(true);}});}
   @Override protected void onDestroy(){if(web!=null){web.removeJavascriptInterface("Android");web.destroy();web=null;}super.onDestroy();}
 }
