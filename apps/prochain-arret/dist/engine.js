@@ -15,11 +15,11 @@ export class TripEngine {
   }
   ingest(p, now=Date.now()) {
     const events=[];
-    if(!validPoint(p)||!Number.isFinite(p.accuracy)||p.accuracy<0||!Number.isFinite(p.timestamp)||p.timestamp>now+5000||now-p.timestamp>MAX_AGE){this.status='stale';return events;}
+    if(!validPoint(p)||!Number.isFinite(p.accuracy)||p.accuracy<0||!Number.isFinite(p.timestamp)||p.timestamp>now+5000||now-p.timestamp>MAX_AGE){this.status='stale';this.hits=0;return events;}
     if(p.accuracy>150){this.status='weak';this.hits=0;return events;}
     if(this.lastGood&&p.timestamp<=this.lastGood.timestamp)return events;
     if(this.lastGood) {
-      const dt=(p.timestamp-this.lastGood.timestamp)/1000;
+      const dt=(p.timestamp-this.lastGood.timestamp)/1000;if(dt>30)this.hits=0;
       if(dt<30&&distance(p,this.lastGood)>110*dt+this.lastGood.accuracy+p.accuracy){this.status='jump';this.hits=0;return events;}
     }
     this.last=p;this.lastGood=p;this.distance=distance(p,this.config.target);this.status='good';
@@ -37,6 +37,6 @@ export class TripEngine {
     if(!this.early&&(nearPrevious||fallback)) {this.early=true;events.push(nearPrevious?'previous':'approach');}
     return events;
   }
-  health(now=Date.now()) {if(!this.lastGood||now-this.lastGood.timestamp>MAX_AGE)return 'stale';return this.status;}
+  health(now=Date.now()) {if(!this.lastGood)return this.status;if(now-this.lastGood.timestamp>MAX_AGE)return 'stale';return this.status;}
   snapshot(){return {early:this.early,arrived:this.arrived};}
 }
