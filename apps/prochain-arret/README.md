@@ -31,7 +31,7 @@ Ce projet est dans `apps/prochain-arret` sur la branche GitHub `prochain-arret` 
 
 `npm run check` puis `npm test`. Pour Android, lancer `bash android/build.sh` avec Java 17, Android platform 35 et build-tools 35.0.0. Le pipeline compile, signe et vérifie la signature de l’APK.
 
-La suite comprend 60 tests moteur/données/cache/accessibilité, 37 scénarios DOM, un parcours DOM complet et 341 trajectoires de parité JavaScript/Java (17 647 positions). Le pipeline effectue également des scénarios de service natif sur émulateurs API 26 et 35 : écran éteint, arrière-plan, signal perdu/retrouvé, minuterie, approche, arrivée, acquittement, arrêt, fermeture forcée, reprise et permission refusée. Voir `TEST-REPORT.md` pour les résultats de la version publiée.
+La suite comprend 60 tests moteur/données/cache/accessibilité, 38 scénarios DOM, un parcours DOM complet et 341 trajectoires de parité JavaScript/Java (17 647 positions). Le pipeline effectue également des scénarios de service natif sur émulateurs API 26 et 35 : écran éteint, arrière-plan, signal perdu/retrouvé, minuterie, approche, arrivée, acquittement, arrêt, fermeture forcée, reprise et permission refusée. Voir `TEST-REPORT.md` pour les résultats de la version publiée.
 
 Les tests de moteur ne remplacent pas des essais réels. La vérification visuelle dans un navigateur et les essais sur un téléphone réel n’étaient pas disponibles dans l’environnement de création. La version doit être testée sur appareil, en particulier : notification écran verrouillé, changement d’app, casques Bluetooth, volume et Ne pas déranger, révocation de permission, mode économie d’énergie, arrêt forcé, tunnel, regain GPS, arrêt à proximité d’une autre ligne, voyage en train rapide.
 
