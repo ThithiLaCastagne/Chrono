@@ -37,6 +37,10 @@ jobs:
       - name: Build and verify pilot APK
         working-directory: apps/prochain-arret
         run: bash android/build.sh
+      - name: Probe live station services
+        continue-on-error: true
+        working-directory: apps/prochain-arret
+        run: node scripts/probe-services.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: prochain-arret-android-pilot

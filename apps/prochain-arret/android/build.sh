@@ -14,7 +14,7 @@ for asset in dist/*; do
 done
 "$SDK_TOOLS/aapt2" compile --dir android/res -o "$OUT_DIR/resources.zip"
 "$SDK_TOOLS/aapt2" link -o "$OUT_DIR/base.apk" -I "$ANDROID_JAR" --manifest android/AndroidManifest.xml --java "$OUT_DIR/gen" -A "$OUT_DIR/assets" "$OUT_DIR/resources.zip"
-javac -encoding UTF-8 -source 8 -target 8 -bootclasspath "$ANDROID_JAR" -d "$OUT_DIR/classes" "$OUT_DIR/gen/fr/prochainarret/app/R.java" android/src/fr/prochainarret/app/*.java
+javac -encoding UTF-8 --release 8 -classpath "$ANDROID_JAR" -d "$OUT_DIR/classes" "$OUT_DIR/gen/fr/prochainarret/app/R.java" android/src/fr/prochainarret/app/*.java
 jar cf "$OUT_DIR/classes.jar" -C "$OUT_DIR/classes" .
 "$SDK_TOOLS/d8" --lib "$ANDROID_JAR" --min-api 26 --output "$OUT_DIR/dex" "$OUT_DIR/classes.jar"
 cp "$OUT_DIR/base.apk" "$OUT_DIR/unsigned.apk"
