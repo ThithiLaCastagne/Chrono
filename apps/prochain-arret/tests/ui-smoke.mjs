@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const {Window}=await import(process.env.DOM_TEST_MODULE);
-const w=new Window({url:'https://example.test/'});
+const w=new Window({url:'https://example.test/',settings:{disableJavaScriptFileLoading:true,disableJavaScriptEvaluation:true,disableCSSFileLoading:true}});
 w.document.write(readFileSync('dist/index.html','utf8'));
 for(const key of ['window','document','localStorage','location'])globalThis[key]=key==='window'?w:w[key];
 Object.defineProperty(globalThis,'navigator',{value:w.navigator,configurable:true});

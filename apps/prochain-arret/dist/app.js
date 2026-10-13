@@ -14,7 +14,7 @@ if(![0,5,10,15,20,30,45,60,90,120].includes(prefs.backup))prefs.backup=0;
 let page='home',selected=null,previous=null,route=null,engine=null,trip=null,watch=null,wake=null,audio=null,audioLoop=null,poll=null,demoTimer=null,searchController=null,routeController=null,heartbeat=null,timeoutWarning=false,reminderFired=false,acknowledged=false,deferredInstall=null,searchResults=[],lastFocus=null,starting=false;
 let recovered=read('trip',null);if(recovered&&!validTrip(recovered))recovered=null;
 let nativeLastEvent='',nativeLastState=null;
-function toast(msg){$('#toast').textContent=msg;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').classList.remove('show'),4500)}
+function toast(msg){$('#toast').textContent=msg;$('#toast').classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast')?.classList.remove('show'),4500)}
 function metric(d){if(!Number.isFinite(d))return ['—',''];return d>=1000?[(d/1000).toLocaleString('fr-FR',{maximumFractionDigits:1}),'km']:[Math.round(d/10)*10,'m'];}
 function stationHtml(s,i,action='result'){return `<button class="station-item" data-${action}="${i}"><span class="station-icon">${icon(/bus/.test(s.kind)?'pin':'train')}</span><span class="station-text"><b>${esc(s.name)}</b><small>${esc(s.city||'Point sélectionné')}${s.kind&&!/lieu|station|halt/.test(s.kind)?' · '+esc(({tram_stop:'Tramway',bus_stop:'Bus',platform:'Quai',stop:'Arrêt'})[s.kind]||'Lieu'):''}</small></span>${icon('arrow')}</button>`}
 function isFav(s){return favorites.some(f=>f.name===s.name&&distance(f,s)<100)}
