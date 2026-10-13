@@ -18,6 +18,11 @@ jobs:
         run: |
           npm run check
           npm test
+      - name: Check UI interactions in a DOM environment
+        working-directory: apps/prochain-arret
+        run: |
+          npm install --prefix "$RUNNER_TEMP/dom-test" --ignore-scripts --no-audit --no-fund happy-dom@20.0.11
+          DOM_TEST_MODULE="$RUNNER_TEMP/dom-test/node_modules/happy-dom/lib/index.js" node tests/ui-smoke.mjs
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
