@@ -1,0 +1,36 @@
+name: Prochain arrêt — tests et Android
+on:
+  push:
+    branches: [prochain-arret]
+  pull_request:
+    branches: [main]
+    paths: ['apps/prochain-arret/**', '.github/workflows/prochain-arret.yml']
+permissions:
+  contents: read
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test the geofence engine
+        working-directory: apps/prochain-arret
+        run: |
+          npm run check
+          npm test
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare Android SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Build and verify pilot APK
+        working-directory: apps/prochain-arret
+        run: bash android/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prochain-arret-android-pilot
+          path: |
+            apps/prochain-arret/android/build/prochain-arret-android.apk
+            apps/prochain-arret/android/build/SHA256SUMS
+          retention-days: 30
