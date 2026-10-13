@@ -8,9 +8,12 @@ PLATFORM_API="35"
 SDK_TOOLS="$SDK_ROOT/build-tools/$TOOLS_VERSION"
 ANDROID_JAR="$SDK_ROOT/platforms/android-$PLATFORM_API/android.jar"
 OUT_DIR="$PWD/android/build"
-mkdir -p "$OUT_DIR/gen" "$OUT_DIR/classes" "$OUT_DIR/dex"
+mkdir -p "$OUT_DIR/gen" "$OUT_DIR/classes" "$OUT_DIR/dex" "$OUT_DIR/assets"
+for asset in dist/*; do
+  case "$asset" in *.apk) ;; *) cp "$asset" "$OUT_DIR/assets/" ;; esac
+done
 "$SDK_TOOLS/aapt2" compile --dir android/res -o "$OUT_DIR/resources.zip"
-"$SDK_TOOLS/aapt2" link -o "$OUT_DIR/base.apk" -I "$ANDROID_JAR" --manifest android/AndroidManifest.xml --java "$OUT_DIR/gen" -A dist "$OUT_DIR/resources.zip"
+"$SDK_TOOLS/aapt2" link -o "$OUT_DIR/base.apk" -I "$ANDROID_JAR" --manifest android/AndroidManifest.xml --java "$OUT_DIR/gen" -A "$OUT_DIR/assets" "$OUT_DIR/resources.zip"
 javac -encoding UTF-8 -source 8 -target 8 -bootclasspath "$ANDROID_JAR" -d "$OUT_DIR/classes" "$OUT_DIR/gen/fr/prochainarret/app/R.java" android/src/fr/prochainarret/app/*.java
 jar cf "$OUT_DIR/classes.jar" -C "$OUT_DIR/classes" .
 "$SDK_TOOLS/d8" --lib "$ANDROID_JAR" --min-api 26 --output "$OUT_DIR/dex" "$OUT_DIR/classes.jar"
