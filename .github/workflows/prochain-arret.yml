@@ -22,7 +22,16 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - name: Test the native geofence engine
+        working-directory: apps/prochain-arret
+        run: |
+          curl --fail --silent --show-error --location https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar --output "$RUNNER_TEMP/json.jar"
+          mkdir -p "$RUNNER_TEMP/native-tests"
+          javac -cp "$RUNNER_TEMP/json.jar" -d "$RUNNER_TEMP/native-tests" android/src/fr/prochainarret/app/Tracker.java tests/TrackerTest.java
+          java -cp "$RUNNER_TEMP/json.jar:$RUNNER_TEMP/native-tests" TrackerTest
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
       - name: Prepare Android SDK
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Build and verify pilot APK

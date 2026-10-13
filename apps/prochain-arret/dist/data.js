@@ -39,7 +39,7 @@ export function parseRoutes(els,target) {
     if(idx<0)idx=stops.findIndex(s=>distance(s,target)<160);
     if(idx<=0)continue;
     const prev=stops[idx-1];if(distance(prev,target)<100)continue;
-    routes.push({id:e.id,ref:clean(e.tags?.ref||'Ligne'),name:clean(e.tags?.name),direction:clean(e.tags?.to||stops.at(-1)?.name),previous:prev,stops:stops.slice(Math.max(0,idx-3),idx+1)});
+    routes.push({id:e.id,ref:clean(e.tags?.ref||'Ligne'),name:clean(e.tags?.name),direction:clean(e.tags?.to||stops.at(-1)?.name),previous:prev,destination:stops[idx],stops:stops.slice(Math.max(0,idx-3),idx+1)});
   }
   return routes.slice(0,20);
 }

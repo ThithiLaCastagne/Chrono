@@ -50,7 +50,7 @@ public class MainActivity extends Activity {
     });
     web.setWebChromeClient(new WebChromeClient(){
       @Override public void onGeolocationPermissionsShowPrompt(String origin,GeolocationPermissions.Callback callback){
-        if(!origin.startsWith(ORIGIN)){callback.invoke(origin,false,false);return;}
+        if(!origin.equals(ORIGIN)){callback.invoke(origin,false,false);return;}
         if(hasLocation()){callback.invoke(origin,true,false);return;}
         geoCallback=callback;geoOrigin=origin;requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},101);
       }
@@ -80,6 +80,7 @@ public class MainActivity extends Activity {
     @JavascriptInterface public String state(){try{JSONObject s=new JSONObject(getSharedPreferences("trip",0).getString("state","{}"));s.put("running",TripService.running);if(!TripService.running&&!s.optBoolean("arrived"))s.put("status","interrupted");return s.toString();}catch(Exception e){return "{}";}}
     @JavascriptInterface public void stop(){runOnUiThread(()->{pendingConfig=null;stopService(new Intent(MainActivity.this,TripService.class));getSharedPreferences("trip",0).edit().clear().apply();getSystemService(NotificationManager.class).cancelAll();});}
     @JavascriptInterface public void clear(){stop();}
+    @JavascriptInterface public void acknowledge(){runOnUiThread(()->{if(TripService.running)startService(new Intent(MainActivity.this,TripService.class).setAction("ACK"));});}
     @JavascriptInterface public void test(String preferences){runOnUiThread(()->{try{testPrefs=new JSONObject(preferences);if(!hasNotifications()&&Build.VERSION.SDK_INT>=33){testing=true;requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},103);}else TripService.test(MainActivity.this,testPrefs);}catch(Exception e){error("Test impossible. Vérifiez les autorisations.");}});}
     @JavascriptInterface public void settings(String type){runOnUiThread(()->{try{Intent i;if("notifications".equals(type)){i=new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName());}else{i=new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName()));}startActivity(i);}catch(Exception ignored){}});}
   }
