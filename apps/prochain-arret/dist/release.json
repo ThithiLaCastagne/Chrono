@@ -1,1 +1,13 @@
-{"androidAvailable":false,"version":"1.0.0","channel":"pilot"}
+{
+  "androidAvailable": true,
+  "version": "1.2.0",
+  "pilot": true,
+  "sha256": "cc3316b0a3f14eed25ca2c7c6aa9f26c18d8ec873e296f963a59926861237adb",
+  "size": 75057,
+  "sourceCommit": "bb6ffd36df4914f0f9126abd619aca426bff1a2c",
+  "testedAndroidApi": [
+    26,
+    35
+  ],
+  "workflowRun": 38704214822
+}

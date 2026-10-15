@@ -13,7 +13,7 @@ Audit du 15 octobre 2026. Objectif : réduire les alertes manquées et les faux 
 | Permissions | Refus initial, révocation en trajet, GPS coupé | Message actionnable ; pas de faux état actif ; rappel web préservé après révocation ; possibilité de réessayer. |
 | Alertes | Fenêtre qui masque l’arrivée ; notifications obsolètes ; mauvais acquittement | Priorités, fermeture du dialogue, focus et fond inerte, notifications nettoyées, identité native unique des actions. |
 | Arrière-plan | Écran éteint, service arrêté, redémarrage, notifications bloquées | Service Android explicite, état réel, aucune reprise silencieuse ; essais natifs API26/35. Web exige page visible. |
-| Batterie | GPS oublié après arrivée, traversée longue | Acquittement de l’arrivée native libère GPS/verrou CPU ; arrêt manuel/permanent et durée maximale. Aucun chiffre d’autonomie inventé. |
+| Batterie | GPS oublié après arrivée, traversée longue | Acquittement de l’arrivée arrête GPS web ; en natif, libère aussi service/verrou CPU ; arrêt manuel/permanent et durée maximale. Aucun chiffre d’autonomie inventé. |
 | Concurrence | Deux onglets concurrents ou effacement dans un autre onglet | Web Locks, bail de secours, arrêt/effacement inter-onglets ; notifications liées au trajet. |
 | Hors connexion | Perte réseau après installation, cache partiel, API indisponible | Interface précachée atomiquement ; calcul local ; API jamais dans cache persistant ; fallback manuel explicite. |
 | Disponibilité externe | 429/406, réponse lente ou malformée | Délai borné, cooldown respecté, aucun contournement, cache mémoire borné, annulation et effacement des requêtes pendantes. |
