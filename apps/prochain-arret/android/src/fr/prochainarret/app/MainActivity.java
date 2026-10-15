@@ -95,7 +95,10 @@ public class MainActivity extends Activity {
     @JavascriptInterface public String state(){try{JSONObject s=new JSONObject(getSharedPreferences("trip",0).getString("state","{}"));s.put("running",TripService.running);if(s.optBoolean("completed"))s.put("status","completed");else if(!TripService.running&&!s.optBoolean("arrived"))s.put("status","interrupted");return s.toString();}catch(Exception e){return "{}";}}
     @JavascriptInterface public void stop(){runOnUiThread(()->{pendingConfig=null;stopService(new Intent(MainActivity.this,TripService.class));getSharedPreferences("trip",0).edit().clear().apply();getSystemService(NotificationManager.class).cancelAll();});}
     @JavascriptInterface public void clear(){stop();}
-    @JavascriptInterface public void acknowledge(){runOnUiThread(()->{if(TripService.running)startService(new Intent(MainActivity.this,TripService.class).setAction("ACK"));});}
+    @JavascriptInterface public void acknowledge(String event,String runToken){
+      if(event==null||event.isEmpty()||runToken==null||runToken.isEmpty())return;
+      runOnUiThread(()->{if(TripService.running)startService(new Intent(MainActivity.this,TripService.class).setAction("ACK").putExtra("event",event).putExtra("journey",runToken));});
+    }
     @JavascriptInterface public void test(String preferences){runOnUiThread(()->{try{testPrefs=new JSONObject(preferences);if(!hasNotifications()&&Build.VERSION.SDK_INT>=33){testing=true;requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},103);}else if(!TripService.alertsEnabled(MainActivity.this,testPrefs))error("Les alertes sont désactivées dans les réglages Android.");else TripService.test(MainActivity.this,testPrefs);}catch(Exception e){error("Test impossible. Vérifiez les autorisations.");}});}
     @JavascriptInterface public void settings(String type){runOnUiThread(()->{try{Intent i;if("notifications".equals(type)){i=new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName());}else{i=new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName()));}startActivity(i);}catch(Exception ignored){}});}
   }

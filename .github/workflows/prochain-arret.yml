@@ -66,6 +66,7 @@ jobs:
           disable-animations: true
           script: bash apps/prochain-arret/android/run-instrumented.sh
       - name: Probe live station services
+        if: matrix.api == 35
         continue-on-error: true
         working-directory: apps/prochain-arret
         run: node scripts/probe-services.mjs

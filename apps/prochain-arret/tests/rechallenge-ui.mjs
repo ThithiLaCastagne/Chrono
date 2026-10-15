@@ -33,6 +33,7 @@ async function page(options = {}) {
   } });
   if (options.wake) Object.defineProperty(w.navigator, 'wakeLock', { value: options.wake, configurable: true });
   if (options.audio) w.AudioContext = options.audio;
+  if (options.android) w.Android = options.android;
   if (options.locks) Object.defineProperty(w.navigator, 'locks', { value: options.locks, configurable: true });
   const registration = {
     waiting: options.waiting ? { postMessage: message => workerMessages.push(message) } : null, installing: null, active: {}, addEventListener() {}, update: async () => {},
@@ -319,4 +320,34 @@ for (const [label, shift] of [['one hour backward', -3600000], ['one day forward
   h.watches[0].ok(h.position(48.85)); await h.flush();
   assert.equal(h.$('#alertOverlay').hidden, false); assert.match(h.$('#alertTitle').textContent, /C’est votre arrêt/);
   assert.equal(h.$('#elapsed').textContent, '0 min'); assert.equal(h.$('#age').textContent, '0 s');
+}));
+
+test('a stale native approach acknowledgement cannot acknowledge a newer arrival event', async () => {
+  let state = {}, config; const acknowledgements = [];
+  const android = {
+    start: json => { config = { ...JSON.parse(json), runToken: 'service-run-qa' }; state = { config, running: true, status: 'good', started: Date.now(), elapsed: 0 }; },
+    state: () => JSON.stringify(state), stop: () => { state = { ...state, running: false }; },
+    acknowledge: (event, runToken) => { acknowledgements.push([event, runToken]); if (event === state.event && runToken === state.config?.runToken) state = { ...state, acknowledgedEvent: event }; }
+  };
+  await scenario({ android }, async h => {
+    h.choose(); await h.start();
+    state = { ...state, event: 'approach:1000', early: true, distance: 500, elapsed: 1000 };
+    await h.advance(1000); assert.match(h.$('#alertTitle').textContent, /approche/);
+    // The service has advanced, but the next UI poll has not happened yet.
+    state = { ...state, event: 'arrived:1500', arrived: true, distance: 0, elapsed: 1500 };
+    h.click('#dismissAlert'); await h.flush();
+    assert.deepEqual(acknowledgements[0], ['approach:1000', 'service-run-qa']);
+    assert.notEqual(state.acknowledgedEvent, 'arrived:1500');
+    await h.advance(1000); assert.equal(h.$('#alertOverlay').hidden, false); assert.match(h.$('#alertTitle').textContent, /C’est votre arrêt/);
+  });
+});
+
+test('acknowledging web arrival stops GPS and ignores subsequent late positions', () => scenario({ notifications: true }, async h => {
+  h.choose(); await h.start(); await h.arrive(); const callback = h.watches[0];
+  h.click('#dismissAlert'); await h.flush();
+  assert.equal(callback.active, false); assert.equal(JSON.parse(h.storage.getItem('pa:trip')), null);
+  const distanceAtCompletion = h.$('#distance').textContent;
+  await h.advance(61000); callback.ok(h.position(48.5)); await h.flush();
+  assert.equal(h.$('#distance').textContent, distanceAtCompletion); assert.equal(h.$('#alertOverlay').hidden, true);
+  assert.equal(JSON.parse(h.storage.getItem('pa:trip')), null); assert.equal(h.notifications.filter(n => !n.closed).length, 0);
 }));

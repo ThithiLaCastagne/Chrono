@@ -42,10 +42,13 @@ public class ServiceScenarios extends Instrumentation {
      fix(.006,20);eventually(()->state().optBoolean("early")&&notification(2),10000,"approach delivered while backgrounded and screen off");
      check(!notification(4)&&!notification(5),"approach removes obsolete GPS and timer warnings");
      Notification approach=notificationValue(2);check(approach.actions!=null&&approach.actions.length==1,"approach has acknowledgement action");check(approach.deleteIntent!=null,"dismissing an alert can cancel its repetitions");
+     String displayedEvent=state().optString("event"),displayedJourney=state().optJSONObject("config").optString("runToken");
      PendingIntent oldAcknowledgement=approach.actions[0].actionIntent;oldAcknowledgement.send();eventually(()->!notification(2),5000,"approach action acknowledges without opening the app");
      check(TripService.running,"acknowledging approach keeps tracking active");SystemClock.sleep(9000);check(!notification(2),"approach acknowledgement stops repetitions");fix(.0004,20);
      eventually(()->state().optBoolean("arrived")&&notification(3),10000,"arrival delivered while backgrounded and screen off");
      oldAcknowledgement.send();SystemClock.sleep(1000);check(TripService.running&&notification(3),"old approach action cannot acknowledge a later arrival");
+     ((MainActivity)activity).new Bridge().acknowledge(displayedEvent,displayedJourney);SystemClock.sleep(1000);check(TripService.running&&notification(3),"stale UI bridge acknowledgement cannot complete a newer arrival");
+     ((MainActivity)activity).new Bridge().acknowledge("","");SystemClock.sleep(500);check(TripService.running&&notification(3),"bridge rejects an acknowledgement without event identity");
      Notification arrival=notificationValue(3);check(arrival.actions!=null&&arrival.actions.length==1,"arrival has acknowledgement action");arrival.actions[0].actionIntent.send();
      eventually(()->!TripService.running&&!notification(1)&&!notification(3),5000,"arrival acknowledgement releases native tracking and ongoing notification");
      check(state().optBoolean("completed")&&state().optBoolean("arrived"),"acknowledged arrival persists a completed journey");check(state().optLong("completedAt")>0,"completion timestamp is retained");check(state().optString("event").equals(state().optString("acknowledgedEvent")),"acknowledged event cannot be replayed as new");

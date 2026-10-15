@@ -20,7 +20,7 @@ public class TripService extends Service implements LocationListener {
   if(intent==null){stopSelf();return START_NOT_STICKY;}
   if("ACK".equals(intent.getAction())){
    if(!running){stopSelf();return START_NOT_STICKY;}
-   String token=intent.getStringExtra("event");if(token!=null&&(!token.equals(event)||!config.optString("runToken").equals(intent.getStringExtra("journey"))))return START_NOT_STICKY;
+   String token=intent.getStringExtra("event");if(token==null||token.isEmpty()||!token.equals(event)||!config.optString("runToken").equals(intent.getStringExtra("journey")))return START_NOT_STICKY;
    if(repeatAlert!=null)handler.removeCallbacks(repeatAlert);clearAlerts();acknowledgedEvent=event;
    if(tracker!=null&&tracker.arrived){completed=true;completedAt=System.currentTimeMillis();running=false;persist(null);stopSelf();}else persist(null);
    return START_NOT_STICKY;
