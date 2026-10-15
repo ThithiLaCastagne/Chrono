@@ -10,7 +10,12 @@ if [ "$API_LEVEL" -ge 33 ]; then adb shell pm grant fr.prochainarret.app android
 adb shell appops set fr.prochainarret.app android:mock_location allow
 adb shell settings put secure location_mode 3
 run_phase() {
-  adb shell am instrument -w -e phase "$1" fr.prochainarret.test/fr.prochainarret.test.ServiceScenarios | tee "android/build/instrumentation-$1.txt"
+  if ! timeout --signal=TERM --kill-after=10s 300s adb shell am instrument -w -e phase "$1" fr.prochainarret.test/fr.prochainarret.test.ServiceScenarios | tee "android/build/instrumentation-$1.txt"; then
+    timeout 20s adb logcat -d -t 300 > "android/build/instrumentation-$1-logcat.txt" || true
+    cat "android/build/instrumentation-$1-logcat.txt"
+    echo "Instrumentation phase $1 failed or exceeded the 300-second limit." >&2
+    return 1
+  fi
   python3 -c 'import sys; text=open(sys.argv[1]).read(); assert "PROCHAIN_ARRET_TESTS_PASSED" in text and "FAILED" not in text, text' "android/build/instrumentation-$1.txt"
 }
 run_phase background

@@ -12,7 +12,8 @@ import java.util.function.BooleanSupplier;
 public class ServiceScenarios extends Instrumentation {
  private Bundle arguments;private Context context;private LocationManager locations;private int assertions=0;
  @Override public void onCreate(Bundle args){super.onCreate(args);arguments=args;start();}
- private void check(boolean value,String label){if(!value)throw new AssertionError(label);assertions++;}
+ private void progress(String label){Bundle status=new Bundle();status.putString("stream","PROCHAIN_ARRET_PROGRESS "+label+"\n");sendStatus(0,status);}
+ private void check(boolean value,String label){if(!value)throw new AssertionError(label);assertions++;progress("check="+assertions+" "+label);}
  private void eventually(BooleanSupplier condition,long timeout,String label){long deadline=SystemClock.elapsedRealtime()+timeout;while(!condition.getAsBoolean()&&SystemClock.elapsedRealtime()<deadline)SystemClock.sleep(100);check(condition.getAsBoolean(),label);}
  private JSONObject state(){try{return new JSONObject(context.getSharedPreferences("trip",0).getString("state","{}"));}catch(Exception e){throw new RuntimeException(e);}}
  private boolean notification(int id){for(StatusBarNotification n:context.getSystemService(NotificationManager.class).getActiveNotifications())if(n.getId()==id)return true;return false;}
@@ -20,10 +21,18 @@ public class ServiceScenarios extends Instrumentation {
  private void shell(String command)throws Exception{try(ParcelFileDescriptor fd=getUiAutomation().executeShellCommand(command);java.io.InputStream in=new ParcelFileDescriptor.AutoCloseInputStream(fd)){byte[] buf=new byte[1024];while(in.read(buf)!=-1){}}}
  private void fix(double offset,float accuracy){Location l=new Location(LocationManager.GPS_PROVIDER);l.setLatitude(48.85+offset);l.setLongitude(2.35);l.setAccuracy(accuracy);l.setTime(System.currentTimeMillis());l.setElapsedRealtimeNanos(SystemClock.elapsedRealtimeNanos());locations.setTestProviderLocation(LocationManager.GPS_PROVIDER,l);}
  private void mockProviders(){locations=context.getSystemService(LocationManager.class);for(String p:new String[]{LocationManager.GPS_PROVIDER,LocationManager.NETWORK_PROVIDER}){locations.addTestProvider(p,false,false,false,false,true,true,true,Criteria.POWER_LOW,Criteria.ACCURACY_FINE);locations.setTestProviderEnabled(p,true);}}
- private Activity visible()throws Exception{shell("input keyevent 224");shell("wm dismiss-keyguard");Activity a=startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));waitForIdleSync();return a;}
+ private Activity visible()throws Exception{
+  progress("waking device before activity launch");shell("input keyevent 224");shell("wm dismiss-keyguard");
+  // startActivitySync waits for a newly created Activity. NEW_TASK alone can
+  // bring an existing task forward and leave that waiter blocked indefinitely.
+  progress("creating a fresh visible activity");
+  Activity a=startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TASK));
+  waitForIdleSync();progress("fresh activity visible");return a;
+ }
  private void startTrip()throws Exception{JSONObject c=new JSONObject().put("id","instrumented-"+System.currentTimeMillis()).put("target",new JSONObject().put("name","Test terminus").put("lat",48.85).put("lon",2.35)).put("radius",800).put("arrivalRadius",130).put("backup",1).put("maxDurationHours",24).put("leadSeconds",60).put("sound",true).put("vibration",true);context.startForegroundService(new Intent(context,TripService.class).setAction("START").putExtra("config",c.toString()));eventually(()->TripService.running&&notification(1),10000,"foreground service and permanent notification");eventually(()->state().optJSONObject("config")!=null&&state().optJSONObject("config").optInt("maxDurationHours")==24,5000,"chosen long journey duration is retained");}
  @Override public void onStart(){super.onStart();context=getTargetContext();Bundle result=new Bundle();String phase=arguments.getString("phase","background");
   try{
+   progress("phase="+phase+" started");
    if(phase.equals("recovery")){
     check(!TripService.running,"force-stop leaves service stopped");check(state().has("config"),"interrupted trip remains available for explicit recovery");
     Activity activity=visible();SystemClock.sleep(2000);check(!TripService.running,"opening the app does not silently resume GPS");check(!notification(1),"no misleading ongoing notification after force-stop");runOnMainSync(()->activity.finish());
