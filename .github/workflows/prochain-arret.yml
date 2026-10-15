@@ -27,7 +27,7 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/dom-test" --ignore-scripts --no-audit --no-fund happy-dom@20.0.11
           DOM_TEST_MODULE="$RUNNER_TEMP/dom-test/node_modules/happy-dom/lib/index.js" node tests/ui-smoke.mjs
-          DOM_TEST_MODULE="$RUNNER_TEMP/dom-test/node_modules/happy-dom/lib/index.js" node --test tests/ui.audit.mjs
+          DOM_TEST_MODULE="$RUNNER_TEMP/dom-test/node_modules/happy-dom/lib/index.js" node --test tests/ui.audit.mjs tests/rechallenge-ui.mjs
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

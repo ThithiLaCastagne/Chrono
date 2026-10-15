@@ -1,53 +1,32 @@
 # Prochain arrêt
 
-Application pilote en français : alertes d’approche et d’arrivée en transports.
+Pilote de rappel de descente, version1.2.0. Application publique sans compte : https://prochain-arret.thibautgiuseppi.chatgpt.site — essai immédiat : https://prochain-arret.thibautgiuseppi.chatgpt.site/?demo=1
 
-- Web : page visible et écran allumé nécessaires, y compris après installation comme PWA.
-- Android 8+ avec Android System WebView à jour : interface embarquée, service natif de localisation `foregroundServiceType=location`, notification permanente, positions toutes les 2,5–3 secondes, verrou CPU borné à 6 heures. Le suivi commence seulement sur une action explicite de l’utilisateur et s’arrête sur demande. Pas de redémarrage caché après fermeture forcée ou reboot.
-- GPS : distance orthodromique, positions périmées (>30 s), imprécises (>150 m), dupliquées ou incohérentes rejetées. Alerte à l’arrêt précédent quand une séquence OSM est connue ; distance de secours toujours conservée. Arrivée dans une zone de 130 m avec prise en compte de l’incertitude et confirmation. Aucun horaire/ETA inventé.
-- Secours : avertissement de perte de signal, minuterie facultative, alertes Android répétées (maximum 4 notifications sur 24 secondes), arrêt explicite depuis la notification.
-- Recherche : Photon et Overpass. Pas de compte requis dans l’application ; favoris/récents conservés localement. La page publiée est publique et ne demande aucune connexion.
+## Fonctionnement
 
-## Utilisation
+- Web/PWA : page visible et écran allumé. Le GPS en arrière-plan n’est pas garanti par le navigateur. L’interface peut fonctionner hors connexion après un premier chargement réussi.
+- Android8+ avec Android System WebView108+ : interface embarquée, service natif de localisation lancé à la demande, notification permanente, positions toutes les2,5–3secondes. Durée bornée par le réglage choisi (1–72h). Aucun redémarrage caché après fermeture forcée ou reboot.
+- Huit profils : bus/car, tram, métro/urbain, train, grande vitesse, bateau/ferry, funiculaire/câble, autre. L’approche utilise un rayon minimal et, si les mesures sont cohérentes, une marge conservatrice liée à la vitesse observée. Ce n’est pas un horaire d’arrivée.
+- Arrivée : le disque d’incertitude GPS doit tenir dans la zone choisie (75–1000m). Les mesures trop anciennes, imprécises, dupliquées, désordonnées ou physiquement incohérentes sont rejetées.
+- Alerte à l’arrêt précédent uniquement si une séquence OpenStreetMap PTv2 fixe et non ambiguë est disponible. La distance reste un secours. L’app ne connaît pas les arrêts sautés, déviations, étages ou quais réels.
+- Le rappel programmé est une minuterie. Sans GPS, aucune progression n’est inventée. Acquitter l’arrivée native arrête le service et libère les ressources.
+- Recherche explicite Photon/Overpass, cache mémoire court, quotas respectés ; calcul du trajet local, sans compte ni analytics. Un point saisi manuellement et les favoris évitent toute dépendance à un catalogue de transport.
 
-Démo directe : https://prochain-arret.thibautgiuseppi.chatgpt.site/?demo=1 — un bouton, aucun compte, aucune permission GPS et aucune recherche réseau.
+## Vérifier
 
-Application : https://prochain-arret.thibautgiuseppi.chatgpt.site
+```sh
+npm run check
+npm test
+DOM_TEST_MODULE=/chemin/vers/happy-dom/lib/index.js node tests/ui-smoke.mjs
+DOM_TEST_MODULE=/chemin/vers/happy-dom/lib/index.js node --test tests/ui.audit.mjs tests/rechallenge-ui.mjs
+```
 
-Ouvrir le lien publié, chercher l’arrêt avec sa ville, vérifier la destination et la direction, tester l’alerte, puis démarrer. Pour utiliser une autre app ou verrouiller l’écran sur Android, installer l’APK proposé via le bouton « Utiliser en arrière-plan sur Android ».
+La CI compile le moteur Java, compare les trajectoires JS/Java, construit et vérifie l’APK, puis exécute les scénarios natifs API26 et API35. Le contrôle des services publics est informatif : il ne transforme pas une indisponibilité externe en couverture validée.
 
-L’APK pilote est signé avec une clé de test générée par la compilation. Ce n’est pas une distribution Play Store. Une compilation ultérieure avec une autre clé nécessite de désinstaller l’ancienne app (perte des données locales). Une clé de production conservée dans un coffre/secret CI est nécessaire avant une distribution durable.
+Le [plan d’audit](AUDIT-PLAN.md) décrit les risques et les critères de livraison. Le [bilan de validation](TEST-REPORT.md) donne les résultats, les versions et les limites réellement observées.
 
-## Sources et arborescence
+## Distribution et limites
 
-Ce projet est dans `apps/prochain-arret` sur la branche GitHub `prochain-arret` du dépôt `ThithiLaCastagne/Chrono`. Le `main` et l’application Chrono ne sont pas modifiés. La PR de travail n’est pas fusionnée automatiquement. Les sources de déploiement Sites sont aussi versionnées par son workflow.
+L’APK est un pilote signé avec une clé de compilation éphémère. Une mise à jour peut exiger la désinstallation et effacer les données locales. Une signature de production durable et une publication sur les stores restent à préparer ; aucune clé privée n’est versionnée.
 
-- `dist/` : interface web et moteur JavaScript autonome ; aucune dépendance npm.
-- `android/` : Activity WebView restreinte aux assets locaux, pont JavaScript, moteur Java équivalent et service natif.
-- `tests/` : scénarios du moteur, validation d’assets et tests JVM Android.
-- `.github/workflows/prochain-arret.yml` : CI à la racine du dépôt GitHub.
-
-## Vérification
-
-`npm run check` puis `npm test`. Pour Android, lancer `bash android/build.sh` avec Java 17, Android platform 35 et build-tools 35.0.0. Le pipeline compile, signe et vérifie la signature de l’APK.
-
-La suite comprend 60 tests moteur/données/cache/accessibilité, 38 scénarios DOM, un parcours DOM complet et 341 trajectoires de parité JavaScript/Java (17 647 positions). Le pipeline effectue également des scénarios de service natif sur émulateurs API 26 et 35 : écran éteint, arrière-plan, signal perdu/retrouvé, minuterie, approche, arrivée, acquittement, arrêt, fermeture forcée, reprise et permission refusée. Voir `TEST-REPORT.md` pour les résultats de la version publiée.
-
-Les tests de moteur ne remplacent pas des essais réels. La vérification visuelle dans un navigateur et les essais sur un téléphone réel n’étaient pas disponibles dans l’environnement de création. La version doit être testée sur appareil, en particulier : notification écran verrouillé, changement d’app, casques Bluetooth, volume et Ne pas déranger, révocation de permission, mode économie d’énergie, arrêt forcé, tunnel, regain GPS, arrêt à proximité d’une autre ligne, voyage en train rapide.
-
-## Limites de fiabilité
-
-Le GPS ne voit pas l’intérieur des tunnels. Le système détecte une perte de signal et l’indique ; il ne prétend pas suivre les stations sous terre. Le mode minuteur est un rappel arbitraire, pas une localisation. Une station proche d’une autre voie peut déclencher une alerte prématurée. Les arrêts/directions OpenStreetMap peuvent être incomplets ou obsolètes. Photon et Overpass sont des services publics sans engagement de disponibilité. En cas d’erreur réseau/serveur, une seule bascule Overpass vers Private.coffee est tentée, avec un délai borné par serveur ; les réponses 429/4xx ne sont pas contournées. Si les deux serveurs sont indisponibles, une recherche par coordonnées reste possible. Les OS, réglages de notification et restrictions batterie peuvent empêcher une alerte.
-
-Le statut de suivi dépend d’une position récente et précise. Les alertes d’approche et d’arrivée sont distinctes et dédupliquées ; si la première position est déjà à destination, seule l’alerte d’arrivée est émise. Un trajet interrompu n’est jamais présenté comme actif ni repris silencieusement.
-
-## Confidentialité
-
-Le calcul est local. Aucun historique complet ni suivi publicitaire. Photon reçoit le texte des recherches. Overpass (overpass-api.de, puis Private.coffee en cas de panne) reçoit les coordonnées des recherches de proximité/de ligne. Les services externes voient l’adresse IP. Les sources cartographiques sont © contributeurs OpenStreetMap, sous ODbL ; leur attribution figure dans l’app. Le cache hors ligne ne contient que le shell applicatif et les choix stockés par l’utilisateur ; les appels API ne sont pas mis en cache par le service worker.
-
-## Documentation technique de référence
-
-- https://www.w3.org/TR/geolocation/ — visibilité et activité du document
-- https://developer.android.com/develop/background-work/services/fgs/service-types — service de localisation Android
-- https://photon.komoot.io/ — recherche et conditions d’utilisation
-- https://www.openstreetmap.org/copyright — attribution et licence des données
+Aucune promesse de fonctionnement sur tous les transports ou tous les téléphones. Le GPS peut manquer en tunnel, en intérieur ou entre des stations superposées. L’application ne sait pas identifier le véhicule réellement emprunté. Le suivi web ne remplace pas une app iOS native pour l’arrière-plan. Les essais de terrain, d’audibilité et d’autonomie restent indispensables avant un usage de confiance.

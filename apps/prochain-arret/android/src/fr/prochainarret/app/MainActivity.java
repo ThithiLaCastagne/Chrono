@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.*;
 import android.content.*;
 import android.content.pm.PackageManager;
+import android.content.pm.PackageInfo;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.*;
@@ -26,6 +27,7 @@ public class MainActivity extends Activity {
 
   @Override public void onCreate(Bundle saved) {
     super.onCreate(saved);
+    if(!supportedWebView())return;
     getWindow().setStatusBarColor(Color.rgb(246,248,245));
     getWindow().setNavigationBarColor(Color.WHITE);
     getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
@@ -57,6 +59,18 @@ public class MainActivity extends Activity {
     });
     web.loadUrl(ORIGIN+"/");
   }
+  private boolean supportedWebView(){
+    PackageInfo provider=WebView.getCurrentWebViewPackage();String version=provider==null?"indisponible":provider.versionName;int major=0;
+    try{major=Integer.parseInt(version.split("\\.")[0]);}catch(Exception ignored){}
+    android.util.Log.i("ProchainArret","WebView provider="+(provider==null?"none":provider.packageName)+" version="+version);
+    if(major>=108)return true;
+    final String packageName=provider==null?"com.google.android.webview":provider.packageName;
+    new AlertDialog.Builder(this).setTitle("Mettez à jour le navigateur Android")
+      .setMessage("L’interface nécessite Android System WebView ou Chrome en version 108 minimum. Version détectée : "+version+". Mettez ce composant à jour, puis rouvrez Prochain arrêt. Votre téléphone doit permettre une version récente de WebView.")
+      .setPositiveButton("Mettre à jour",(dialog,which)->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("market://details?id="+packageName)));}catch(Exception e){try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://play.google.com/store/apps/details?id="+packageName)));}catch(Exception ignored){}}finish();})
+      .setNegativeButton("Fermer",(dialog,which)->finish()).setOnCancelListener(dialog->finish()).show();
+    return false;
+  }
   private boolean hasLocation(){return checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;}
   private boolean hasNotifications(){return Build.VERSION.SDK_INT<33||checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)==PackageManager.PERMISSION_GRANTED;}
   private void error(String s){if(web!=null)web.evaluateJavascript("window.onAndroidError && window.onAndroidError("+JSONObject.quote(s)+")",null);}
@@ -65,7 +79,7 @@ public class MainActivity extends Activity {
     if(!hasLocation()||!hasNotifications()){List<String> p=new ArrayList<>();if(!hasLocation()){p.add(Manifest.permission.ACCESS_FINE_LOCATION);p.add(Manifest.permission.ACCESS_COARSE_LOCATION);}if(!hasNotifications()&&Build.VERSION.SDK_INT>=33)p.add(Manifest.permission.POST_NOTIFICATIONS);requestPermissions(p.toArray(new String[0]),102);return;}
     NotificationManager nm=getSystemService(NotificationManager.class);
     JSONObject preferences;try{preferences=new JSONObject(pendingConfig);}catch(Exception e){pendingConfig=null;error("Destination invalide.");return;}
-    if(!TripService.alertsEnabled(this,preferences)){pendingConfig=null;error("Les notifications sont désactivées. Activez-les dans les réglages Android avant de démarrer.");return;}
+    if(!TripService.alertsEnabled(this,preferences)){pendingConfig=null;error("Les alertes Android sont désactivées ou silencieuses. Activez leur son ou leurs vibrations dans les réglages avant de démarrer.");return;}
     android.location.LocationManager lm=getSystemService(android.location.LocationManager.class);
     if(!lm.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER)&&!lm.isProviderEnabled(android.location.LocationManager.NETWORK_PROVIDER)){pendingConfig=null;error("Activez la localisation du téléphone avant de démarrer.");return;}
     Intent i=new Intent(this,TripService.class).setAction("START").putExtra("config",pendingConfig);pendingConfig=null;
@@ -74,17 +88,17 @@ public class MainActivity extends Activity {
   @Override public void onRequestPermissionsResult(int req,String[] perms,int[] results){super.onRequestPermissionsResult(req,perms,results);
     if(req==101&&geoCallback!=null){geoCallback.invoke(geoOrigin,hasLocation(),false);geoCallback=null;}
     if(req==102){if(hasLocation()&&hasNotifications())startPending();else{pendingConfig=null;error("Autorisez la position précise et les notifications pour activer le suivi.");}}
-    if(req==103&&testing){testing=false;if(hasNotifications())TripService.test(this,testPrefs);else error("Autorisez les notifications pour tester l’alerte.");}
+    if(req==103&&testing){testing=false;if(hasNotifications()&&TripService.alertsEnabled(this,testPrefs))TripService.test(this,testPrefs);else error("Autorisez les notifications et leur son ou vibration pour tester l’alerte.");}
   }
   public class Bridge {
     @JavascriptInterface public void start(String config){runOnUiThread(()->{try{JSONObject c=new JSONObject(config);if(!Tracker.valid(c))throw new Exception();pendingConfig=config;startPending();}catch(Exception e){error("Destination invalide.");}});}
-    @JavascriptInterface public String state(){try{JSONObject s=new JSONObject(getSharedPreferences("trip",0).getString("state","{}"));s.put("running",TripService.running);if(!TripService.running&&!s.optBoolean("arrived"))s.put("status","interrupted");return s.toString();}catch(Exception e){return "{}";}}
+    @JavascriptInterface public String state(){try{JSONObject s=new JSONObject(getSharedPreferences("trip",0).getString("state","{}"));s.put("running",TripService.running);if(s.optBoolean("completed"))s.put("status","completed");else if(!TripService.running&&!s.optBoolean("arrived"))s.put("status","interrupted");return s.toString();}catch(Exception e){return "{}";}}
     @JavascriptInterface public void stop(){runOnUiThread(()->{pendingConfig=null;stopService(new Intent(MainActivity.this,TripService.class));getSharedPreferences("trip",0).edit().clear().apply();getSystemService(NotificationManager.class).cancelAll();});}
     @JavascriptInterface public void clear(){stop();}
     @JavascriptInterface public void acknowledge(){runOnUiThread(()->{if(TripService.running)startService(new Intent(MainActivity.this,TripService.class).setAction("ACK"));});}
     @JavascriptInterface public void test(String preferences){runOnUiThread(()->{try{testPrefs=new JSONObject(preferences);if(!hasNotifications()&&Build.VERSION.SDK_INT>=33){testing=true;requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},103);}else if(!TripService.alertsEnabled(MainActivity.this,testPrefs))error("Les alertes sont désactivées dans les réglages Android.");else TripService.test(MainActivity.this,testPrefs);}catch(Exception e){error("Test impossible. Vérifiez les autorisations.");}});}
     @JavascriptInterface public void settings(String type){runOnUiThread(()->{try{Intent i;if("notifications".equals(type)){i=new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,getPackageName());}else{i=new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:"+getPackageName()));}startActivity(i);}catch(Exception ignored){}});}
   }
-  @Override public void onBackPressed(){web.evaluateJavascript("window.closeTopOverlay && window.closeTopOverlay()",closed->{if(!"true".equals(closed)){if(!TripService.running)MainActivity.super.onBackPressed();else moveTaskToBack(true);}});}
+  @Override public void onBackPressed(){if(web==null){super.onBackPressed();return;}web.evaluateJavascript("window.closeTopOverlay && window.closeTopOverlay()",closed->{if(!"true".equals(closed)){if(!TripService.running)MainActivity.super.onBackPressed();else moveTaskToBack(true);}});}
   @Override protected void onDestroy(){if(web!=null){web.removeJavascriptInterface("Android");web.destroy();web=null;}super.onDestroy();}
 }

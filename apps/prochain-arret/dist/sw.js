@@ -1,5 +1,5 @@
-const CACHE='prochain-arret-v1.1.0';
-const ASSETS=['./','./index.html','./style.css','./app.js','./engine.js','./data.js','./icon.svg','./icon-192.png','./icon-512.png','./manifest.webmanifest','./release.json'];
+const CACHE='prochain-arret-v1.2.0';
+const ASSETS=['./','./index.html','./style.css','./app.js','./engine.js','./profiles.js','./ownership.js','./data.js','./icon.svg','./icon-192.png','./icon-512.png','./manifest.webmanifest'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)))});
 // Do not force an update in the middle of an active journey.
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('prochain-arret-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
@@ -10,3 +10,6 @@ self.addEventListener('fetch',event=>{
  event.respondWith(caches.open(CACHE).then(c=>c.match(event.request)).then(cached=>cached||fetch(event.request)));
 });
 self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(clients=>{for(const c of clients){if(c.url.startsWith(self.registration.scope)){c.postMessage({type:'OPEN_TRIP'});return c.focus()}}return self.clients.openWindow(self.registration.scope)}))});
+
+// Activate only on explicit idle-page request, with no other tab to interrupt.
+self.addEventListener('message',event=>{if(event.data?.type!=='ACTIVATE_UPDATE')return;event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(clients=>{const ours=clients.filter(c=>c.url.startsWith(self.registration.scope));if(ours.length===1&&event.source?.id===ours[0].id)return self.skipWaiting();event.source?.postMessage({type:'UPDATE_BLOCKED'})}))});

@@ -9,7 +9,7 @@ test('a pair of near-simultaneous provider reports does not confirm arrival',()=
 test('the full GPS uncertainty is used for the arrival geofence',()=>{const e=new TripEngine(config);const fix=p(target.lat+.0006,100);e.ingest(fix,now);e.ingest({...fix,timestamp:now+3000},now+3000);assert.equal(e.arrived,false)});
 test('malformed remote results never crash or invent a coordinate',()=>{assert.deepEqual(normalizeFeatures({}),[]);assert.deepEqual(normalizeFeatures([null,{}, {geometry:{coordinates:[null,null]},properties:{name:'Bad'}}]),[])});
 const stop=(id,name,lat)=>({type:'node',id,lat,lon:2.35,tags:{name}});
-const relation=members=>({type:'relation',id:10,tags:{ref:'1',to:'North'},members:members.map(ref=>({type:'node',ref,role:'stop'}))});
+const relation=members=>({type:'relation',id:10,tags:{type:'route',route:'bus','public_transport:version':'2',ref:'1',to:'North'},members:members.map(ref=>({type:'node',ref,role:'stop'}))});
 test('a missing unnamed intermediate stop must not invent the preceding station',()=>{const els=[stop(1,'A',48.83),stop(2,'',48.84),stop(3,'Destination',48.85),relation([1,2,3])];assert.deepEqual(parseRoutes(els,target),[])});
 test('a missing member must not invent the preceding station',()=>{assert.deepEqual(parseRoutes([stop(1,'A',48.83),stop(3,'Destination',48.85),relation([1,2,3])],target),[])});
 test('an unrelated nearby stop is not treated as the named destination',()=>{assert.deepEqual(parseRoutes([stop(1,'A',48.83),stop(2,'Different station',48.8501),relation([1,2])],target),[])});

@@ -21,3 +21,19 @@ export function trajectories(){
  }
  return scenarios;
 }
+
+// Explicit mode profiles across unrelated hemispheres. These are simulations,
+// not evidence that any operator supplies complete stop/line data.
+export function multimodalTrajectories(){
+ const scenarios=[];
+ const places=[{lat:48.85,lon:2.35},{lat:-33.87,lon:151.21},{lat:35.68,lon:139.76},{lat:-1.29,lon:36.82},{lat:34.05,lon:-118.24},{lat:59.91,lon:10.75},{lat:-18,lon:179.999}];
+ const profiles=[['bus',800,130,60,6,15],['tram',800,130,60,6,12],['metro',1000,150,60,6,20],['train',3000,250,60,24,45],['highspeed',8000,300,120,24,138.89],['ferry',1500,250,60,48,15],['cable',500,130,60,2,6],['other',1000,150,60,12,20]];
+ for(const [id,radius,arrivalRadius,leadSeconds,maxDurationHours,speed]of profiles)for(const place of places)for(const noisy of [false,true]){
+  const target={...place,name:'Destination '+id};const config={target,radius,arrivalRadius,leadSeconds,maxDurationHours,transport:id};const points=[];let i=0;
+  const stopDistance=arrivalRadius*.5;
+  for(let remaining=radius+2000;remaining>stopDistance;remaining-=speed*5){const timestamp=NOW+i*5000;points.push({p:{...move(target,remaining+(noisy?Math.sin(i*3.7)*9:0),90),accuracy:noisy?45:20,timestamp},now:timestamp});i++;}
+  for(let j=0;j<3;j++){const timestamp=NOW+(i+j)*5000;points.push({p:{...move(target,stopDistance,90),accuracy:noisy?45:20,timestamp},now:timestamp});}
+  scenarios.push({name:`${id} ${place.lat},${place.lon} ${noisy?'GPS noise':'clear'}`,config,points,expectArrival:true});
+ }
+ return scenarios;
+}

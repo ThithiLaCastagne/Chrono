@@ -10,7 +10,7 @@ ANDROID_JAR="$SDK_ROOT/platforms/android-$PLATFORM_API/android.jar"
 OUT_DIR="$PWD/android/build"
 mkdir -p "$OUT_DIR/gen" "$OUT_DIR/classes" "$OUT_DIR/dex" "$OUT_DIR/assets"
 for asset in dist/*; do
-  case "$asset" in *.apk) ;; *) cp "$asset" "$OUT_DIR/assets/" ;; esac
+  case "$asset" in *.apk|*/release.json|*/SHA256SUMS.txt) ;; *) cp "$asset" "$OUT_DIR/assets/" ;; esac
 done
 "$SDK_TOOLS/aapt2" compile --dir android/res -o "$OUT_DIR/resources.zip"
 "$SDK_TOOLS/aapt2" link -o "$OUT_DIR/base.apk" -I "$ANDROID_JAR" --manifest android/AndroidManifest.xml --java "$OUT_DIR/gen" -A "$OUT_DIR/assets" "$OUT_DIR/resources.zip"
