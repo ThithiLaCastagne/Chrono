@@ -1,6 +1,6 @@
 # Prochain arrêt
 
-Pilote de rappel de descente, version1.2.0. Application publique sans compte : https://prochain-arret.thibautgiuseppi.chatgpt.site — essai immédiat : https://prochain-arret.thibautgiuseppi.chatgpt.site/?demo=1
+Pilote de rappel de descente, version1.2.1. Application publique sans compte : https://prochain-arret.thibautgiuseppi.chatgpt.site — essai immédiat : https://prochain-arret.thibautgiuseppi.chatgpt.site/?demo=1
 
 ## Fonctionnement
 

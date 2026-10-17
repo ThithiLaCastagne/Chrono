@@ -1,3 +1,21 @@
+# Prochain arrêt 1.2.1 — améliorations du parcours
+
+17 octobre 2026. Cette passe conserve le fonctionnement de rappel par destination et n’ajoute aucune prétention de couverture universelle.
+
+- Favoris accessibles depuis l’accueil ; récents dédupliqués, destination correcte après filtrage.
+- Choix de ligne et de direction visible sans ouvrir les réglages avancés.
+- Changement de transport incompatible : suppression de l’ancienne ligne et de l’arrêt précédent, nouvelle confirmation ; passage train/TGV compatible conservé.
+- Résumés des alertes synchronisés avec les distances réellement sélectionnées, sans déplacer le focus ; réglages avancés laissés ouverts lors des mises à jour de configuration.
+- État GPS plus lisible ; précision insuffisante pour confirmer l’arrivée distinguée d’une position exploitable. Annonces d’état seulement lorsque le texte change.
+- Bouton de relance de localisation conservé entre les actualisations, avec son focus.
+- Version Android 1.2.1-pilot, versionCode 4 ; migration du cache web 1.2.0 vers 1.2.1.
+
+Validation locale : 126 tests de logique/données/cache et 80 scénarios DOM, dont 8 nouvelles régressions ; parcours DOM complet réussi. Quatre des cinq premiers nouveaux scénarios reproduisaient des défauts sur 1.2.0 avant correction. Contrastes des nouveaux états calculés entre 5,74:1 et 7,14:1. Aucune capture ni validation visuelle dans un navigateur disponible ; les règles de disposition responsive n’ont pas été inspectées sur appareil réel. Le moteur GPS et le service natif restent identiques à 1.2.0. Compilation Android et publication de ce correctif : en cours, preuves à compléter.
+
+Les limites terrain, de disponibilité des données et de localisation souterraine du bilan 1.2 ci-dessous restent applicables.
+
+---
+
 # Prochain arrêt 1.2 — bilan de validation
 
 Audit du 15 octobre 2026. Ce document distingue les résultats automatisés, les essais natifs sur émulateur et les vérifications restant à faire sur téléphone réel. Il suit le [plan d’attaque et ses critères de livraison](AUDIT-PLAN.md).

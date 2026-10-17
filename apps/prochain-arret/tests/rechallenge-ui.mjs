@@ -351,3 +351,93 @@ test('acknowledging web arrival stops GPS and ignores subsequent late positions'
   assert.equal(h.$('#distance').textContent, distanceAtCompletion); assert.equal(h.$('#alertOverlay').hidden, true);
   assert.equal(JSON.parse(h.storage.getItem('pa:trip')), null); assert.equal(h.notifications.filter(n => !n.closed).length, 0);
 }));
+
+const savedRailJourney = () => ({
+  id: 'rail-configuration', target: { name: 'Gare destination', lat: 48.85, lon: 2.35 },
+  previous: { name: 'Gare précédente', lat: 48.86, lon: 2.35 },
+  route: { ref: 'R 42', direction: 'Terminus ferroviaire', mode: 'train' },
+  transport: 'train', radius: 3000, arrivalRadius: 250, leadSeconds: 60, maxDurationHours: 24, backup: 0
+});
+
+test('changing to an incompatible transport clears the old line and previous stop', () => scenario({ seed: { trip: savedRailJourney() } }, async h => {
+  h.click('#resumeTrip'); h.$('#ack').checked = true; h.$('#ack').dispatchEvent(new h.w.Event('change'));
+  h.change('#transport', 'ferry');
+  assert.equal(h.$('#ack').checked, false); assert.equal(h.$('#start').disabled, true);
+  assert.ok(!h.$('#clearLine'), 'the previous line must be cleared'); assert.doesNotMatch(h.$('.timeline').textContent, /Gare précédente|R 42|Terminus ferroviaire/);
+  await h.start(); const trip = JSON.parse(h.storage.getItem('pa:trip'));
+  assert.equal(trip.transport, 'ferry'); assert.equal(trip.route, null); assert.equal(trip.previous, null);
+}));
+
+test('switching between train and high-speed train preserves a compatible selected line', () => scenario({ seed: { trip: savedRailJourney() } }, async h => {
+  h.click('#resumeTrip'); h.$('#ack').checked = true; h.$('#ack').dispatchEvent(new h.w.Event('change'));
+  h.change('#transport', 'highspeed');
+  assert.equal(h.$('#ack').checked, false); assert.equal(h.$('#start').disabled, true);
+  assert.ok(h.$('#clearLine')); assert.match(h.$('.timeline').textContent, /Gare précédente/);
+  await h.start(); const trip = JSON.parse(h.storage.getItem('pa:trip'));
+  assert.equal(trip.transport, 'highspeed'); assert.equal(trip.route.ref, 'R 42'); assert.equal(trip.previous.name, 'Gare précédente');
+}));
+
+test('the visible alert summary follows edited distances without moving keyboard focus', () => scenario({}, async h => {
+  h.choose(); h.$('#radiusInput').focus(); h.change('#radiusInput', 8000);
+  assert.match(h.$('#approachSummary')?.textContent || '', /8\s?km/);
+  assert.ok(h.w.document.activeElement === h.$('#radiusInput'), 'radius input keeps focus');
+  h.$('#arrivalInput').focus(); h.change('#arrivalInput', 500);
+  assert.match(h.$('#arrivalSummary')?.textContent || '', /500\s?m/);
+  assert.ok(h.w.document.activeElement === h.$('#arrivalInput'), 'arrival input keeps focus');
+  h.$('[data-radius="1500"]').focus(); h.click('[data-radius="1500"]');
+  assert.match(h.$('#approachSummary')?.textContent || '', /1,5\s?km/);
+  assert.ok(h.w.document.activeElement === h.$('[data-radius="1500"]'), 'distance button keeps focus');
+  assert.equal(h.$('#radiusInput').value, '1500');
+}));
+
+test('GPS retry retains its DOM node and focus across tracking ticks', () => scenario({}, async h => {
+  h.choose(); await h.start(); h.watches[0].error({ code: 1 }); h.click('#dismissAlert');
+  const retry = h.$('#retryGPS'); assert.ok(retry); retry.focus();
+  await h.advance(3000);
+  assert.ok(h.$('#retryGPS') === retry, 'a live ticker must not continuously replace a focused recovery control');
+  assert.ok(h.w.document.activeElement === retry, 'retry control keeps focus');
+  retry.click(); await h.flush(); assert.equal(h.watches.filter(w => w.active).length, 1);
+}));
+
+test('a favorite opened from home has the same configuration as from the favorites tab', () => scenario({ seed: {
+  favorites: [{ name: 'Ma gare habituelle', lat: 48.85, lon: 2.35, kind: 'station', city: 'Bordeaux' }],
+  prefs: { transport: 'train', radius: 3000, backup: 30 }
+} }, async h => {
+  assert.ok(h.$('#content [data-fav="0"]'), 'frequent destinations should be directly available on home');
+  h.click('#content [data-fav="0"]');
+  const home = { name: h.$('.destination-card b').textContent, transport: h.selectedOption('#transport'), radius: h.$('#radiusInput').value, arrival: h.$('#arrivalInput').value, backup: h.selectedOption('#backup') };
+  assert.equal(h.$('#start').disabled, true, 'home shortcuts still require an explicit activation');
+  h.click('[data-page="favorites"]'); h.click('[data-fav="0"]');
+  const tab = { name: h.$('.destination-card b').textContent, transport: h.selectedOption('#transport'), radius: h.$('#radiusInput').value, arrival: h.$('#arrivalInput').value, backup: h.selectedOption('#backup') };
+  assert.deepEqual(home, tab); assert.equal(tab.name, 'Ma gare habituelle');
+  await h.start(); assert.equal(h.watches.filter(w => w.active).length, 1);
+}));
+
+test('insufficient arrival precision is visible and the status node survives subsequent ticks', () => scenario({}, async h => {
+  h.choose(); await h.start(); await h.advance(1000);
+  h.watches[0].ok(h.position(48.87, 140)); await h.flush();
+  const status = h.$('#signalText'); assert.match(status.textContent, /trop imprécis/);
+  assert.equal(h.$('.tracking-hero').dataset.quality, 'uncertain');
+  await h.advance(3000); assert.ok(h.$('#signalText') === status, 'live status must retain its stable node');
+  h.watches[0].ok(h.position(48.87, 20)); await h.flush();
+  assert.doesNotMatch(status.textContent, /trop imprécis/); assert.match(status.textContent, /suivi actif/);
+  assert.equal(h.$('.tracking-hero').dataset.quality, 'good');
+}));
+
+test('precision exactly equal to the arrival radius is not labeled impossible before confirmation', () => scenario({}, async h => {
+  h.choose(); await h.start(); await h.advance(31000);
+  h.watches[0].ok(h.position(48.85, 130)); await h.flush();
+  assert.doesNotMatch(h.$('#signalText').textContent, /trop imprécis/);
+  await h.advance(1600); h.watches[0].ok(h.position(48.85, 130)); await h.flush();
+  assert.match(h.$('#alertTitle').textContent, /C’est votre arrêt/); assert.match(h.$('#signalText').textContent, /arrivée atteinte/);
+}));
+
+test('home recent stops exclude favorites without changing the destination of remaining shortcuts', () => scenario({ seed: {
+  favorites: [{ name: 'Arrêt favori', lat: 48.85, lon: 2.35 }],
+  recent: [{ name: 'Arrêt favori', lat: 48.8501, lon: 2.35 }, { name: 'Autre arrêt récent', lat: 48.84, lon: 2.34 }]
+} }, async h => {
+  const labels = [...h.w.document.querySelectorAll('#content [data-fav] .station-text b, #content [data-recent] .station-text b')].map(e => e.textContent);
+  assert.deepEqual(labels, ['Arrêt favori', 'Autre arrêt récent']);
+  h.click('[data-recent="0"]'); assert.equal(h.$('.destination-card b').textContent, 'Autre arrêt récent');
+  assert.match(h.$('.destination-card').textContent, /48\.84000, 2\.34000/);
+}));

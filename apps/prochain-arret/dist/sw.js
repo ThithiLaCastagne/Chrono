@@ -1,4 +1,4 @@
-const CACHE='prochain-arret-v1.2.0';
+const CACHE='prochain-arret-v1.2.1';
 const ASSETS=['./','./index.html','./style.css','./app.js','./engine.js','./profiles.js','./ownership.js','./data.js','./icon.svg','./icon-192.png','./icon-512.png','./manifest.webmanifest'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)))});
 // Do not force an update in the middle of an active journey.
