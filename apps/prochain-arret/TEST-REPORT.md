@@ -11,7 +11,11 @@
 
 Validation locale : syntaxe réussie, **167 tests de logique/données/cache** (41 nouveaux), **97 scénarios DOM** (17 nouveaux), parcours DOM complet et contrôle des différences réussis. Les nouveaux scénarios couvrent notamment le parcours complet, les filtres et index, le refus GPS, la précision limite, les positions périmées/futures, les requêtes annulées et tardives, le timeout GPS, les retours pendant le chargement, le rafraîchissement, les données vides et le refus HTTP 406.
 
-Les réponses réseau sont simulées dans ces tests. Elles ne prouvent pas la disponibilité ni la couverture d’une ville réelle. Le dernier contrôle réel du fournisseur Overpass a renvoyé HTTP 406 : aucun contournement du refus n’est utilisé. Les essais de terrain et l’inspection sur téléphone restent à faire. Les résultats Android et la provenance de publication seront ajoutés après la compilation de cette version.
+Les réponses réseau sont simulées dans ces tests. Elles ne prouvent pas la disponibilité ni la couverture d’une ville réelle. Le dernier contrôle réel du fournisseur Overpass a renvoyé HTTP 406 : aucun contournement du refus n’est utilisé. Les essais de terrain et l’inspection sur téléphone restent à faire. La compilation et les essais natifs ont réussi sur API26 et API35 : 48 assertions par environnement, en quatre phases. Ces essais portent sur le service natif, sans piloter le rendu de l’interface WebView. CI [39055485166](https://github.com/ThithiLaCastagne/Chrono/actions/runs/39055485166), source `33064c33c520e1209f5f9038e927c2e4a385682e`. Parité JavaScript/Java réussie sur 453 trajectoires et 22 281 positions. Photon et son contrôle CORS réussissent ; Overpass renvoie encore HTTP 406 en CI.
+
+Livraison Android vérifiée : artefact API35 `12109277312`, ZIP SHA-256 `72e35b2aa01ce7a6355fe2c26dd53bb5fe4a37e076c561ad85e5a43c80183fa6`. APK de 83 249 octets, SHA-256 `44db6c72c3bde7aa063e18bd684f50af45d53e57253e99e2c40c6fd5a6d5ddec`. Les quatre phases natives et les 12 ressources embarquées ont été contrôlées après téléchargement ; les ressources sont identiques aux sources locales testées.
+
+Publication 1.3 réussie le 17 octobre 2026 à 17:56 UTC, version Sites 5, source Sites `b9f50fa30f5d2d3fb25622fdd2075bf45e676abc`. Téléchargements anonymes de l’interface, du module de données, des métadonnées et de l’APK : HTTP 200, contenus identiques aux fichiers testés et empreinte APK vérifiée après publication.
 
 ---
 

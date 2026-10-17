@@ -1,13 +1,13 @@
 {
   "androidAvailable": true,
-  "version": "1.2.1",
+  "version": "1.3.0",
   "pilot": true,
-  "sha256": "1a05455273d036f6c4481b66a4bdeef6f327cab10a9e4d46ea1f3c8a61154560",
-  "size": 75057,
-  "sourceCommit": "7039ddb4ae3d0acb31433b3f65c33b4ece510b6a",
+  "sha256": "44db6c72c3bde7aa063e18bd684f50af45d53e57253e99e2c40c6fd5a6d5ddec",
+  "size": 83249,
+  "sourceCommit": "33064c33c520e1209f5f9038e927c2e4a385682e",
   "testedAndroidApi": [
     26,
     35
   ],
-  "workflowRun": 39053551449
+  "workflowRun": 39055485166
 }
