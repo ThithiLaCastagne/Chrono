@@ -47,6 +47,80 @@ export function buildRouteQuery(target) {
   return `[out:json][timeout:9][maxsize:16777216];(${exact}${STOP_FILTERS.map(f=>`nwr(around:500,${target.lat},${target.lon})${f};`).join('')})->.s;(rel(bn.s)${filter};rel(bw.s)${filter};rel(br.s)${filter};)->.routes;.routes out body;(${members});out body center;`;
 }
 
+export const NEARBY_LINE_LIMIT=60;
+const lineFilter=()=>`[type=route][route~"^(${ROUTE_MODES.join('|')})$"]["public_transport:version"="2"]`;
+const validLineId=id=>Number.isSafeInteger(id)&&id>0;
+function lineId(line){if(!validLineId(line?.id))throw new Error('Ligne invalide. Relancez la recherche de proximité.');return line.id;}
+function fixedLine(e){return e?.type==='relation'&&validLineId(e.id)&&e.tags?.type==='route'&&e.tags?.['public_transport:version']==='2'&&ROUTE_MODES.includes(e.tags?.route)&&e.tags?.on_demand!=='yes';}
+function lineMetadata(e){return {id:e.id,ref:clean(e.tags.ref)||'Ligne',name:clean(e.tags.name),direction:clean(e.tags.to),from:clean(e.tags.from),mode:e.tags.route,network:clean(e.tags.network),operator:clean(e.tags.operator),via:clean(e.tags.via)};}
+
+export function buildNearbyLinesQuery(p){
+  if(!validPoint(p))throw new Error('Coordonnées invalides. Réessayez la localisation.');
+  const around=`(around:700,${p.lat},${p.lon})`;
+  const stops=STOP_FILTERS.map(f=>`nwr${around}${f};`).join('');
+  // Roads/tracks are candidates too: a passenger can be between mapped stops.
+  const paths=['[highway]','[railway]','[route=ferry]','[aerialway]'].map(f=>`way${around}${f};`).join('');
+  const filter=lineFilter();
+  return `[out:json][timeout:9][maxsize:16777216];(${stops}${paths})->.near;(rel(bn.near)${filter};rel(bw.near)${filter};rel(br.near)${filter};);out tags ${NEARBY_LINE_LIMIT};`;
+}
+
+export function parseNearbyLines(els){
+  const seen=new Set(),lines=[];
+  for(const e of Array.isArray(els)?els:[]){if(!fixedLine(e)||seen.has(e.id))continue;seen.add(e.id);lines.push(lineMetadata(e));}
+  return lines.sort((a,b)=>a.ref.localeCompare(b.ref,'fr',{numeric:true,sensitivity:'base'})||a.direction.localeCompare(b.direction,'fr')||a.id-b.id).slice(0,NEARBY_LINE_LIMIT);
+}
+
+export function buildLineStopsQuery(line){
+  const id=lineId(line),members=MEMBER_ROLES.flatMap(role=>['node','way','rel'].map(type=>`${type}(r.routes:"${role}");`)).join('');
+  return `[out:json][timeout:9][maxsize:16777216];rel(${id})${lineFilter()}->.routes;.routes out body;(${members});out body center;`;
+}
+
+function sameStop(a,b){return a.ids.some(id=>id&&b.ids.includes(id))||(distance(a,b)<250&&a.aliases.some(x=>normalized(x)&&b.aliases.some(y=>normalized(x)===normalized(y))));}
+function linePositions(result,p){return {...result,stops:result.stops.map(s=>s?{...s,distanceFromPosition:validPoint(p)?distance(p,s):null}:null)};}
+
+export function parseLineStops(els,line,p=null){
+  const id=lineId(line);
+  if(p!==null&&!validPoint(p))throw new Error('Coordonnées invalides. Réessayez la localisation.');
+  const items=Array.isArray(els)?els.filter(e=>e&&typeof e==='object'):[];
+  const matches=items.filter(e=>e.type==='relation'&&e.id===id);
+  const relation=matches.length===1?matches[0]:null;
+  if(!fixedLine(relation)||!Array.isArray(relation.members)||relation.members.some(m=>m?.role==='hail_and_ride'||/^(forward|backward)/.test(m?.role||'')))throw new Error('La séquence de cette ligne n’est pas exploitable. Choisissez une autre ligne ou votre destination par son nom.');
+  const nodes=new Map(items.map(e=>[e.type+':'+e.id,e])),raw=[];
+  let interveningMember=false;
+  for(const member of relation.members){
+    if(!member){interveningMember=true;continue;}
+    if(!MEMBER_ROLES.includes(member.role)){
+      if(/^(stop|platform)(_|$)/.test(member.role||'')){raw.push(null);interveningMember=false;}
+      else interveningMember=true;
+      continue;
+    }
+    // PTv2 puts stop pairs before its geometry. An unknown object inserted among
+    // stops could be an unlabelled stop: do not infer adjacency across it.
+    if(interveningMember){raw.push(null);interveningMember=false;}
+    const node=nodes.get(member.type+':'+member.ref),name=placeName(node?.tags);
+    const stop=node?{name,...pointOf(node),id:osmId(node),ids:[osmId(node)],aliases:aliases(node.tags),roles:[member.role]}:null;
+    if(!validPoint(stop)||!stop.name){raw.push(null);continue;}
+    const last=raw.at(-1),isPair=last&&last.roles.length===1&&last.roles[0].split('_')[0]==='stop'&&member.role.split('_')[0]==='platform'&&distance(last,stop)<250&&last.aliases.some(a=>normalized(a)&&stop.aliases.some(b=>normalized(a)===normalized(b)));
+    if(isPair){last.roles.push(member.role);last.ids.push(stop.id);last.aliases=[...new Set([...last.aliases,...stop.aliases])];}
+    else raw.push(stop);
+  }
+  // Do not truncate a sequence and accidentally imply its last point is a terminus.
+  if(raw.length>1000)throw new Error('Cette ligne contient trop d’arrêts pour être chargée. Recherchez directement votre destination.');
+  const asPoint=s=>({id:s.id,name:s.name,lat:s.lat,lon:s.lon});
+  const stops=raw.map((s,index)=>{
+    if(!s)return null;
+    const visits=raw.map((other,i)=>other&&sameStop(s,other)?i:-1).filter(i=>i>=0);
+    return {...asPoint(s),index,occurrence:visits.indexOf(index)+1,canBoard:!s.roles.some(r=>r.endsWith('_exit_only')),canAlight:!s.roles.some(r=>r.endsWith('_entry_only')),ambiguous:visits.length>1,previous:null,distanceFromPosition:null};
+  });
+  for(let i=1;i<stops.length;i++){
+    const current=stops[i],previous=stops[i-1];
+    if(current?.canAlight&&!current.ambiguous&&previous&&!previous.ambiguous&&distance(current,previous)>=100)current.previous=asPoint(previous);
+  }
+  const metadata=lineMetadata(relation);
+  metadata.from=metadata.from||stops[0]?.name||'';metadata.direction=metadata.direction||stops.at(-1)?.name||'';
+  return linePositions({line:metadata,stops,hasGaps:stops.some(s=>s===null),hasRepeatedStops:stops.some(s=>s?.ambiguous)},p);
+}
+
 export function normalizeNearby(els,p) {
   if(!Array.isArray(els)||!validPoint(p))return [];
   const list=els.filter(e=>e&&/^(node|way|relation)$/.test(e.type)).map(e=>({name:placeName(e.tags),...pointOf(e),city:'À proximité',kind:clean(e.tags?.amenity||e.tags?.railway||e.tags?.highway||(e.tags?.aerialway==='station'?'aerialway_station':e.tags?.public_transport))||'stop',id:osmId(e)})).filter(s=>s.name&&validPoint(s)&&distance(p,s)<=1350);
@@ -137,8 +211,19 @@ export function createTransitClient({fetcher=(...args)=>fetch(...args),clock=()=
       checkAbort(signal);const epoch=cacheEpoch,query=buildRouteQuery(target),key='routes:'+target.lat.toFixed(5)+','+target.lon.toFixed(5)+':'+clean(target.id)+':'+clean(target.name),hit=fromCache(key);if(hit!==null)return hit;
       return remember(key,parseRoutes(await overpass(query,signal),target),900000,epoch);
     },
+    async nearbyLines(p,signal){
+      checkAbort(signal);const epoch=cacheEpoch,query=buildNearbyLinesQuery(p),key='nearby-lines:'+p.lat.toFixed(4)+','+p.lon.toFixed(4),hit=fromCache(key);if(hit!==null)return hit;
+      return remember(key,parseNearbyLines(await overpass(query,signal)),120000,epoch);
+    },
+    async loadLineStops(line,p,signal){
+      checkAbort(signal);const query=buildLineStopsQuery(line);if(!validPoint(p))throw new Error('Coordonnées invalides. Réessayez la localisation.');
+      const position={lat:p.lat,lon:p.lon},id=line.id,epoch=cacheEpoch,key='line-stops:'+id,hit=fromCache(key);
+      if(hit!==null)return linePositions(hit,position);
+      const sequence=parseLineStops(await overpass(query,signal),{id});
+      remember(key,sequence,900000,epoch);return linePositions(sequence,position);
+    },
     clearCache(){cacheEpoch++;cache.clear();}
   };
 }
 const client=createTransitClient();
-export const searchStations=client.searchStations,nearbyStops=client.nearbyStops,findRoutes=client.findRoutes,clearSearchCache=client.clearCache;
+export const searchStations=client.searchStations,nearbyStops=client.nearbyStops,findRoutes=client.findRoutes,nearbyLines=client.nearbyLines,loadLineStops=client.loadLineStops,clearSearchCache=client.clearCache;

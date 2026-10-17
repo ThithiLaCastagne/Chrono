@@ -1,3 +1,20 @@
+# Prochain arrêt 1.3 — lignes autour de moi
+
+17 octobre 2026. Nouveau parcours : localisation ponctuelle → ligne et direction → arrêt de descente → confirmation du rappel. Le choix renseigne la destination, le transport et, lorsque la séquence le permet, l’arrêt précédent. La recherche par destination reste accessible.
+
+- Découverte dans un rayon de 700 m autour des arrêts et des tracés, donc également entre deux arrêts. Jusqu’à 60 relations fixes PTv2 ; plafond indiqué dans l’interface. Les directions et variantes restent distinctes.
+- Position récente avec précision strictement inférieure à 500 m requise avant envoi de coordonnées au fournisseur. Annulation, délai total de 35 s et réponses tardives contrôlés. La position est un instantané, sans suivi continu pendant le choix.
+- Liste ordonnée des arrêts, recherche locale insensible aux accents, arrêt le plus proche indiqué comme proximité géographique. Aucun filtrage supposant que l’utilisateur a déjà dépassé certains arrêts.
+- Montée seule désactivée ; lacunes conservées ; arrêts répétés et boucles signalés ; aucun précédent inventé en cas d’ambiguïté. Le mode par distance reste disponible avec un libellé explicite.
+- Retour à la liste sans nouvelle demande GPS, rafraîchissement annulable, erreurs distinctes d’une absence de résultats. Affichage responsive et cibles tactiles agrandies ; rendu visuel réel non inspecté dans cet environnement.
+- Android 1.3.0-pilot, versionCode 5 ; cache web 1.3.0. Le moteur de suivi et le service natif sont inchangés.
+
+Validation locale : syntaxe réussie, **167 tests de logique/données/cache** (41 nouveaux), **97 scénarios DOM** (17 nouveaux), parcours DOM complet et contrôle des différences réussis. Les nouveaux scénarios couvrent notamment le parcours complet, les filtres et index, le refus GPS, la précision limite, les positions périmées/futures, les requêtes annulées et tardives, le timeout GPS, les retours pendant le chargement, le rafraîchissement, les données vides et le refus HTTP 406.
+
+Les réponses réseau sont simulées dans ces tests. Elles ne prouvent pas la disponibilité ni la couverture d’une ville réelle. Le dernier contrôle réel du fournisseur Overpass a renvoyé HTTP 406 : aucun contournement du refus n’est utilisé. Les essais de terrain et l’inspection sur téléphone restent à faire. Les résultats Android et la provenance de publication seront ajoutés après la compilation de cette version.
+
+---
+
 # Prochain arrêt 1.2.1 — améliorations du parcours
 
 17 octobre 2026. Cette passe conserve le fonctionnement de rappel par destination et n’ajoute aucune prétention de couverture universelle.

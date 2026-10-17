@@ -1,9 +1,10 @@
 # Prochain arrêt
 
-Pilote de rappel de descente, version1.2.1. Application publique sans compte : https://prochain-arret.thibautgiuseppi.chatgpt.site — essai immédiat : https://prochain-arret.thibautgiuseppi.chatgpt.site/?demo=1
+Pilote de rappel de descente, version1.3.0. Application publique sans compte : https://prochain-arret.thibautgiuseppi.chatgpt.site — essai immédiat : https://prochain-arret.thibautgiuseppi.chatgpt.site/?demo=1
 
 ## Fonctionnement
 
+- Parcours rapide : « Lignes autour de moi » → ligne et direction → arrêt de descente. Recherche autour des arrêts et des tracés à 700 m ; jusqu’à 60 lignes fixes PTv2, selon les données OpenStreetMap disponibles. Le transport et l’arrêt précédent exploitable sont préremplis. La localisation ne choisit ni le véhicule ni le sens à votre place.
 - Web/PWA : page visible et écran allumé. Le GPS en arrière-plan n’est pas garanti par le navigateur. L’interface peut fonctionner hors connexion après un premier chargement réussi.
 - Android8+ avec Android System WebView108+ : interface embarquée, service natif de localisation lancé à la demande, notification permanente, positions toutes les2,5–3secondes. Durée bornée par le réglage choisi (1–72h). Aucun redémarrage caché après fermeture forcée ou reboot.
 - Huit profils : bus/car, tram, métro/urbain, train, grande vitesse, bateau/ferry, funiculaire/câble, autre. L’approche utilise un rayon minimal et, si les mesures sont cohérentes, une marge conservatrice liée à la vitesse observée. Ce n’est pas un horaire d’arrivée.

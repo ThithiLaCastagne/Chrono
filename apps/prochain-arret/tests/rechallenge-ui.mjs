@@ -441,3 +441,212 @@ test('home recent stops exclude favorites without changing the destination of re
   h.click('[data-recent="0"]'); assert.equal(h.$('.destination-card b').textContent, 'Autre arrêt récent');
   assert.match(h.$('.destination-card').textContent, /48\.84000, 2\.34000/);
 }));
+
+// Nearby-line scenarios use real Overpass JSON and the production data parser.
+const lineTag = (id, ref, to, mode = 'tram') => ({ type: 'relation', id, tags: {
+  type: 'route', route: mode, 'public_transport:version': '2', ref, from: 'Université', to,
+  name: `Université — ${to}`, network: 'Réseau Azur', operator: 'Transports de la Cité'
+} });
+const nearbyLineFixtures = () => [lineTag(101, '4', 'Étoile'), lineTag(202, '12', 'Hôtel de Ville', 'bus')];
+function lineStopFixtures(id = 101, gap = false) {
+  const isBus = id === 202;
+  const names = isBus ? ['Gare', 'Hôpital', 'Hôtel de Ville', 'Terminus'] : ['Université', 'Musée', 'Étoile', 'Terminus'];
+  const relation = lineTag(id, isBus ? '12' : '4', isBus ? 'Hôtel de Ville' : 'Étoile', isBus ? 'bus' : 'tram');
+  relation.members = names.map((_, index) => ({ type: 'node', ref: id * 10 + index, role: index === 0 ? 'stop_entry_only' : 'stop' }));
+  return [relation, ...names.flatMap((name, index) => gap && index === 1 ? [] : [{ type: 'node', id: id * 10 + index, lat: 48.87 - index * .005, lon: 2.35, tags: { name, public_transport: 'stop_position' } }])];
+}
+const overpassResponse = elements => ({ ok: true, status: 200, headers: { get: () => null }, json: async () => ({ elements }) });
+function fixtureTransport(options = {}) {
+  const requests = [];
+  const fetch = async (url, request = {}) => {
+    const query = request.body?.get?.('data') || '';
+    requests.push({ url: String(url), query, signal: request.signal });
+    if (options.respond) return options.respond(query, requests.length, request);
+    const id = query.match(/rel\((\d+)\)/)?.[1];
+    return overpassResponse(id ? lineStopFixtures(Number(id), !!options.gap) : nearbyLineFixtures());
+  };
+  return { fetch, requests };
+}
+const inputText = (h, selector, value) => { h.activate(); assert.ok(h.$(selector), selector); h.$(selector).value = value; h.$(selector).dispatchEvent(new h.w.Event('input', { bubbles: true })); };
+
+async function openNearbyLine(h, index = 0) {
+  h.click('#nearbyLines'); await h.flush();
+  h.click(`[data-nearby-line="${index}"]`); await h.flush();
+}
+
+test('nearby-line flow: GPS to a real line sequence configures its stop, previous stop and transport', async () => {
+  const network = fixtureTransport();
+  await scenario({ fetch: network.fetch }, async h => {
+    await openNearbyLine(h); assert.equal(h.permissionRequests.length, 1); assert.equal(network.requests.length, 2);
+    assert.match(network.requests[0].query, /out tags/); assert.match(network.requests[0].query, /48\.87/);
+    assert.match(network.requests[1].query, /rel\(101\)/);
+    h.click('[data-line-stop="2"]');
+    assert.equal(h.$('.destination-card b').textContent, 'Étoile'); assert.equal(h.selectedOption('#transport'), 'tram');
+    assert.match(h.$('.timeline').textContent, /Musée/); assert.equal(h.$('#start').disabled, true);
+    await h.start(); const trip = JSON.parse(h.storage.getItem('pa:trip'));
+    assert.equal(trip.target.name, 'Étoile'); assert.equal(trip.previous.name, 'Musée'); assert.equal(trip.route.ref, '4'); assert.equal(trip.route.direction, 'Étoile');
+    assert.equal(trip.transport, 'tram'); assert.equal(network.requests.length, 2, 'activation does not repeat station lookups');
+  });
+});
+
+test('nearby-line flow: returning to the lines preserves results without another GPS or network call', async () => {
+  const network = fixtureTransport();
+  await scenario({ fetch: network.fetch }, async h => {
+    await openNearbyLine(h); h.click('#backToLines'); await h.flush();
+    assert.equal(h.w.document.querySelectorAll('[data-nearby-line]').length, 2);
+    assert.equal(network.requests.length, 2); assert.equal(h.permissionRequests.length, 1);
+    assert.match(h.$('[data-nearby-line="0"]').textContent, /Étoile/);
+  });
+});
+
+test('nearby-line flow: accent-insensitive line and stop filters retain original selection indices', async () => {
+  const network = fixtureTransport();
+  await scenario({ fetch: network.fetch }, async h => {
+    h.click('#nearbyLines'); await h.flush(); inputText(h, '#lineFilter', 'hotel');
+    assert.equal(h.w.document.querySelectorAll('[data-nearby-line]').length, 1);
+    assert.ok(h.$('[data-nearby-line="1"]')); h.click('[data-nearby-line="1"]'); await h.flush();
+    assert.match(network.requests[1].query, /rel\(202\)/); inputText(h, '#stopFilter', 'hotel');
+    assert.equal(h.w.document.querySelectorAll('[data-line-stop]').length, 1);
+    assert.ok(h.$('[data-line-stop="2"]')); h.click('[data-line-stop="2"]');
+    assert.equal(h.$('.destination-card b').textContent, 'Hôtel de Ville'); assert.equal(h.selectedOption('#transport'), 'bus');
+    assert.match(h.$('.timeline').textContent, /Hôpital/);
+  });
+});
+
+test('nearby-line flow: a boarding-only stop is visible but cannot become a destination', async () => {
+  const network = fixtureTransport();
+  await scenario({ fetch: network.fetch }, async h => {
+    await openNearbyLine(h); const boarding = h.$('[data-line-stop="0"]'); assert.ok(boarding);
+    assert.equal(boarding.disabled, true); boarding.click(); await h.flush();
+    assert.ok(h.$('#backToLines')); assert.ok(!h.$('#start'));
+    assert.equal(h.$('[data-line-stop="2"]').disabled, false);
+  });
+});
+
+test('nearby-line flow: an unmapped intermediate stop is a barrier, never a fabricated predecessor', async () => {
+  const network = fixtureTransport({ gap: true });
+  await scenario({ fetch: network.fetch }, async h => {
+    await openNearbyLine(h); assert.ok(!h.$('[data-line-stop="1"]')); assert.ok(h.$('[data-line-stop="2"]'));
+    h.click('[data-line-stop="2"]'); await h.start(); const trip = JSON.parse(h.storage.getItem('pa:trip'));
+    assert.equal(trip.target.name, 'Étoile'); assert.equal(trip.previous, null);
+  });
+});
+
+test('nearby-line flow: denied GPS gives a destination-search fallback without making network requests', async () => {
+  const network = fixtureTransport();
+  await scenario({ fetch: network.fetch, pendingGPS: true }, async h => {
+    h.click('#nearbyLines'); h.permissionRequests[0].error({ code: 1 }); await h.flush();
+    assert.equal(network.requests.length, 0); assert.match(h.$('#content').textContent, /refusée|autorise/i);
+    assert.ok(h.$('#destinationFallback')); h.click('#destinationFallback'); assert.ok(h.$('#searchForm'));
+    assert.ok(h.w.document.activeElement === h.$('#query'), 'the fallback places focus in the destination search');
+  });
+});
+
+test('nearby-line flow: canceling a pending GPS permission ignores its late success', async () => {
+  const network = fixtureTransport();
+  await scenario({ fetch: network.fetch, pendingGPS: true }, async h => {
+    h.click('#nearbyLines'); assert.equal(h.permissionRequests.length, 1); h.click('#cancelNearby');
+    h.permissionRequests[0].ok(h.position()); await h.flush();
+    assert.equal(network.requests.length, 0); assert.ok(h.$('#nearbyLines')); assert.ok(!h.$('[data-nearby-line]'));
+  });
+});
+
+test('nearby-line flow: a stop response cannot replace a different tab after navigation', async () => {
+  const pending = deferred(); const network = fixtureTransport({ respond: query => query.includes('out tags') ? overpassResponse(nearbyLineFixtures()) : pending.promise });
+  await scenario({ fetch: network.fetch }, async h => {
+    h.click('#nearbyLines'); await h.flush(); h.click('[data-nearby-line="0"]'); await h.flush();
+    assert.equal(network.requests.length, 2); h.click('[data-page="favorites"]');
+    pending.resolve(overpassResponse(lineStopFixtures())); await h.flush();
+    assert.ok(!h.$('[data-line-stop]')); assert.match(h.$('#content h2').textContent, /Vos arrêts/);
+    assert.equal(network.requests[1].signal.aborted, true);
+  });
+});
+
+test('nearby-line flow: a genuinely empty result explains it and preserves destination fallback', async () => {
+  const network = fixtureTransport({ respond: () => overpassResponse([]) });
+  await scenario({ fetch: network.fetch }, async h => {
+    h.click('#nearbyLines'); await h.flush(); assert.equal(network.requests.length, 1);
+    assert.ok(!h.$('[data-nearby-line]')); assert.match(h.$('#content').textContent, /aucune|pas de ligne/i);
+    assert.ok(h.$('#destinationFallback')); assert.ok(h.$('#nearbyRefresh'));
+  });
+});
+
+test('nearby-line flow: canceled requests resolving in reverse order cannot replace newer lines', async () => {
+  const first = deferred(), second = deferred(); const network = fixtureTransport({ respond: (_, number) => number === 1 ? first.promise : second.promise });
+  await scenario({ fetch: network.fetch }, async h => {
+    h.click('#nearbyLines'); await h.flush(); h.click('#cancelNearby'); h.click('#nearbyLines'); await h.flush();
+    assert.equal(network.requests.length, 2); second.resolve(overpassResponse([lineTag(303, '9', 'Nouveau terminus')])); await h.flush();
+    first.resolve(overpassResponse(nearbyLineFixtures())); await h.flush();
+    assert.equal(h.w.document.querySelectorAll('[data-nearby-line]').length, 1);
+    assert.match(h.$('[data-nearby-line="0"]').textContent, /Nouveau terminus/); assert.doesNotMatch(h.$('#content').textContent, /Étoile/);
+    assert.equal(network.requests[0].signal.aborted, true);
+  });
+});
+
+for (const [label, mutate] of [
+  ['a stale fix', p => ({ ...p, timestamp: p.timestamp - 31000 })],
+  ['a 500 metre uncertainty', p => ({ ...p, coords: { ...p.coords, accuracy: 500 } })],
+  ['a future fix', p => ({ ...p, timestamp: p.timestamp + 6000 })]
+]) test('nearby-line flow: ' + label + ' is rejected before sharing coordinates with the service', async () => {
+  const network = fixtureTransport();
+  await scenario({ fetch: network.fetch, pendingGPS: true }, async h => {
+    h.click('#nearbyLines'); h.permissionRequests[0].ok(mutate(h.position())); await h.flush();
+    assert.equal(network.requests.length, 0); assert.ok(h.$('#destinationFallback')); assert.ok(h.$('#nearbyRefresh'));
+    assert.match(h.$('#content').textContent, /précis|ancienne|incohérent|réessay/i);
+  });
+});
+
+test('nearby-line flow: an unanswered GPS prompt times out and its late fix makes no request', async () => {
+  const network = fixtureTransport();
+  await scenario({ fetch: network.fetch, pendingGPS: true }, async h => {
+    h.click('#nearbyLines'); assert.ok(h.$('.discovery-state'));
+    await h.advance(36000);
+    assert.ok(!h.$('.discovery-state'), 'the GPS permission prompt cannot leave an infinite loader');
+    assert.match(h.$('#content [role="alert"]').textContent, /trop de temps|réessay/i);
+    assert.equal(h.$('#nearbyRefresh').disabled, false); assert.ok(h.$('#destinationFallback'));
+    h.permissionRequests[0].ok(h.position()); await h.flush();
+    assert.equal(network.requests.length, 0); assert.ok(!h.$('[data-nearby-line]'));
+  });
+});
+
+test('nearby-line flow: returning before the stop response preserves the lines and ignores that response', async () => {
+  const pending = deferred(); const network = fixtureTransport({ respond: query => query.includes('out tags') ? overpassResponse(nearbyLineFixtures()) : pending.promise });
+  await scenario({ fetch: network.fetch }, async h => {
+    h.click('#nearbyLines'); await h.flush(); h.click('[data-nearby-line="1"]'); await h.flush();
+    h.click('#backToLines');
+    assert.equal(h.w.document.querySelectorAll('[data-nearby-line]').length, 2);
+    assert.ok(h.w.document.activeElement === h.$('[data-nearby-line="1"]'), 'return restores the selected line focus');
+    pending.resolve(overpassResponse(lineStopFixtures(202))); await h.flush();
+    assert.ok(!h.$('[data-line-stop]')); assert.equal(h.w.document.querySelectorAll('[data-nearby-line]').length, 2);
+    assert.equal(network.requests[1].signal.aborted, true); assert.equal(network.requests.length, 2);
+    assert.equal(h.permissionRequests.length, 1);
+  });
+});
+
+test('nearby-line flow: refresh is single-flight and cancel preserves the previous selectable lines', async () => {
+  const network = fixtureTransport();
+  await scenario({ fetch: network.fetch, pendingGPS: true }, async h => {
+    h.click('#nearbyLines'); h.permissionRequests[0].ok(h.position()); await h.flush();
+    h.click('#nearbyRefresh'); h.click('#nearbyRefresh');
+    assert.equal(h.permissionRequests.length, 2, 'a double click cannot create two location prompts');
+    assert.equal(h.$('#nearbyRefresh').disabled, true);
+    assert.equal(h.w.document.querySelectorAll('[data-nearby-line]').length, 2);
+    assert.equal(h.$('[data-nearby-line="0"]').disabled, true, 'old results are visible but disabled during refresh');
+    h.click('#cancelNearby');
+    assert.equal(h.$('[data-nearby-line="0"]').disabled, false); assert.equal(h.$('#nearbyRefresh').disabled, false);
+    h.permissionRequests[1].ok(h.position(48.88)); await h.flush();
+    assert.equal(network.requests.length, 1, 'a canceled refresh does not share its late coordinates');
+    assert.equal(h.w.document.querySelectorAll('[data-nearby-line]').length, 2);
+  });
+});
+
+// Last: the production client intentionally retains a server's rate-limit cooldown.
+test('nearby-line flow: HTTP 406 is a service error, never an empty set of lines', async () => {
+  const network = fixtureTransport({ respond: () => ({ ok: false, status: 406, headers: { get: () => '30' }, json: async () => ({ elements: [] }) }) });
+  await scenario({ fetch: network.fetch }, async h => {
+    h.click('#nearbyLines'); await h.flush(); assert.equal(network.requests.length, 1);
+    assert.match(h.$('#content').textContent, /ne répond pas|indisponible|réessay/i);
+    assert.doesNotMatch(h.$('#content').textContent, /aucune ligne trouvée|pas de ligne autour/i);
+    assert.ok(h.$('#destinationFallback'));
+  });
+});
