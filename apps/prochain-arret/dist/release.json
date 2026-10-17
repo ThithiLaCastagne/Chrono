@@ -1,0 +1,13 @@
+{
+  "androidAvailable": true,
+  "version": "1.3.0",
+  "pilot": true,
+  "sha256": "44db6c72c3bde7aa063e18bd684f50af45d53e57253e99e2c40c6fd5a6d5ddec",
+  "size": 83249,
+  "sourceCommit": "33064c33c520e1209f5f9038e927c2e4a385682e",
+  "testedAndroidApi": [
+    26,
+    35
+  ],
+  "workflowRun": 39055485166
+}

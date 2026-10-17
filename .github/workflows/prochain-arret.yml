@@ -1,0 +1,80 @@
+name: Prochain arrêt — tests et Android
+on:
+  push:
+    branches: [prochain-arret]
+  pull_request:
+    branches: [main]
+    paths: ['apps/prochain-arret/**', '.github/workflows/prochain-arret.yml']
+permissions:
+  contents: read
+jobs:
+  validate-and-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [26, 35]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Test the geofence engine
+        working-directory: apps/prochain-arret
+        run: |
+          npm run check
+          npm test
+      - name: Check UI interactions in a DOM environment
+        working-directory: apps/prochain-arret
+        run: |
+          npm install --prefix "$RUNNER_TEMP/dom-test" --ignore-scripts --no-audit --no-fund happy-dom@20.0.11
+          DOM_TEST_MODULE="$RUNNER_TEMP/dom-test/node_modules/happy-dom/lib/index.js" node tests/ui-smoke.mjs
+          DOM_TEST_MODULE="$RUNNER_TEMP/dom-test/node_modules/happy-dom/lib/index.js" node --test tests/ui.audit.mjs tests/rechallenge-ui.mjs
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Test the native geofence engine
+        working-directory: apps/prochain-arret
+        run: |
+          curl --fail --silent --show-error --location https://repo.maven.apache.org/maven2/org/json/json/20240303/json-20240303.jar --output "$RUNNER_TEMP/json.jar"
+          mkdir -p "$RUNNER_TEMP/native-tests"
+          javac -cp "$RUNNER_TEMP/json.jar" -d "$RUNNER_TEMP/native-tests" android/src/fr/prochainarret/app/Tracker.java tests/TrackerTest.java tests/ParityTest.java
+          java -cp "$RUNNER_TEMP/json.jar:$RUNNER_TEMP/native-tests" TrackerTest
+          node scripts/parity-fixtures.mjs "$RUNNER_TEMP/parity.jsonl"
+          java -cp "$RUNNER_TEMP/json.jar:$RUNNER_TEMP/native-tests" ParityTest "$RUNNER_TEMP/parity.jsonl"
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools
+      - name: Prepare Android SDK
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Build and verify pilot APK
+        working-directory: apps/prochain-arret
+        run: |
+          bash android/build.sh
+          bash android/build-tests.sh
+      - name: Enable KVM for native Android lifecycle tests
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Native Android API ${{ matrix.api }} background, screen-off, recovery and permission scenarios
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7_pro
+          disable-animations: true
+          script: bash apps/prochain-arret/android/run-instrumented.sh
+      - name: Probe live station services
+        if: matrix.api == 35
+        continue-on-error: true
+        working-directory: apps/prochain-arret
+        run: node scripts/probe-services.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prochain-arret-android-pilot-api-${{ matrix.api }}
+          path: |
+            apps/prochain-arret/android/build/prochain-arret-android.apk
+            apps/prochain-arret/android/build/SHA256SUMS
+            apps/prochain-arret/android/build/instrumentation-*.txt
+          retention-days: 30

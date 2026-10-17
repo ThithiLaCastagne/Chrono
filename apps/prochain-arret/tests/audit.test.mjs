@@ -1,0 +1,16 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {TripEngine,validTrip,distance} from '../dist/engine.js';
+import {normalizeFeatures,parseRoutes} from '../dist/data.js';
+const now=1700000000000,target={name:'Destination',lat:48.85,lon:2.35},config={target,radius:800};
+const p=(lat=target.lat,accuracy=60,timestamp=now)=>({lat,lon:target.lon,accuracy,timestamp});
+test('configuration rejects a blank name, invalid arrival radius and corrupted timer',()=>{for(const bad of [{...config,target:{...target,name:'  '}},{...config,arrivalRadius:-1},{...config,arrivalRadius:100000},{...config,backup:'20'},{...config,backup:-1}])assert.equal(validTrip(bad),false)});
+test('null saved state is safe and string flags are not interpreted as true',()=>{assert.equal(new TripEngine(config,null).early,false);assert.equal(new TripEngine(config,{arrived:'false'}).arrived,false)});
+test('a pair of near-simultaneous provider reports does not confirm arrival',()=>{const e=new TripEngine(config);e.ingest(p(),now);assert.deepEqual(e.ingest(p(target.lat,60,now+5),now+5),[]);assert.equal(e.arrived,false);assert.deepEqual(e.ingest(p(target.lat,60,now+2500),now+2500),['arrived'])});
+test('the full GPS uncertainty is used for the arrival geofence',()=>{const e=new TripEngine(config);const fix=p(target.lat+.0006,100);e.ingest(fix,now);e.ingest({...fix,timestamp:now+3000},now+3000);assert.equal(e.arrived,false)});
+test('malformed remote results never crash or invent a coordinate',()=>{assert.deepEqual(normalizeFeatures({}),[]);assert.deepEqual(normalizeFeatures([null,{}, {geometry:{coordinates:[null,null]},properties:{name:'Bad'}}]),[])});
+const stop=(id,name,lat)=>({type:'node',id,lat,lon:2.35,tags:{name}});
+const relation=members=>({type:'relation',id:10,tags:{type:'route',route:'bus','public_transport:version':'2',ref:'1',to:'North'},members:members.map(ref=>({type:'node',ref,role:'stop'}))});
+test('a missing unnamed intermediate stop must not invent the preceding station',()=>{const els=[stop(1,'A',48.83),stop(2,'',48.84),stop(3,'Destination',48.85),relation([1,2,3])];assert.deepEqual(parseRoutes(els,target),[])});
+test('a missing member must not invent the preceding station',()=>{assert.deepEqual(parseRoutes([stop(1,'A',48.83),stop(3,'Destination',48.85),relation([1,2,3])],target),[])});
+test('an unrelated nearby stop is not treated as the named destination',()=>{assert.deepEqual(parseRoutes([stop(1,'A',48.83),stop(2,'Different station',48.8501),relation([1,2])],target),[])});
+test('ambiguous loop occurrences are not silently assigned a direction',()=>{assert.deepEqual(parseRoutes([stop(1,'A',48.83),stop(2,'Destination',48.85),stop(3,'B',48.84),stop(4,'Destination',48.85),relation([1,2,3,4])],target),[])});

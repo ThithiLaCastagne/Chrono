@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
+const css=readFileSync('dist/style.css','utf8'),html=readFileSync('dist/index.html','utf8');
+const luminance=hex=>{const c=hex.match(/[a-f0-9]{2}/gi).map(h=>parseInt(h,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return c[0]*.2126+c[1]*.7152+c[2]*.0722};
+const contrast=(a,b)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
+test('primary, secondary, notice and alert text palettes reach 4.5:1',()=>{for(const [fg,bg]of [['#ffffff','#0b7a68'],['#203b3b','#ffffff'],['#556b60','#ffffff'],['#556b60','#edf1e9'],['#795813','#faf6ea'],['#4c6450','#eff5ed'],['#923f33','#fff3ef'],['#4c6450','#eff9ea']])assert.ok(contrast(fg,bg)>=4.5,fg+' on '+bg+': '+contrast(fg,bg));assert.match(css,/--muted:#556b60/)});
+test('keyboard focus has sufficient contrast and reduced motion is supported',()=>{assert.ok(contrast('#0b7a68','#ffffff')>=3);assert.match(css,/focus-visible/);assert.match(css,/prefers-reduced-motion:reduce/)});
+test('document language, landmarks and dialog names are declared',()=>{assert.match(html,/<html lang="fr">/);assert.match(html,/<main/);assert.match(html,/<nav[^>]*aria-label=/);assert.match(html,/<dialog[^>]*aria-labelledby="modalTitle"/);assert.match(html,/role="alertdialog"[^>]*aria-describedby="alertMessage"/);assert.match(html,/role="status" aria-live="polite"/)});

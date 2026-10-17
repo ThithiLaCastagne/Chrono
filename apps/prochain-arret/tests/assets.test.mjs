@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync,existsSync} from 'node:fs';
+test('all locally referenced entry assets exist',()=>{const h=readFileSync('dist/index.html','utf8');for(const match of h.matchAll(/(?:src|href)="\.\/([^"#]+)"/g))assert.ok(existsSync('dist/'+match[1]),match[1]);});
+test('offline assets all exist',()=>{const sw=readFileSync('dist/sw.js','utf8');const assets=sw.match(/const ASSETS=\[([^\]]+)\]/)[1];for(const m of assets.matchAll(/'\.\/([^']+)'/g))assert.ok(existsSync('dist/'+m[1]),m[1]);});
+test('manifest declares real icons and relative scope',()=>{const m=JSON.parse(readFileSync('dist/manifest.webmanifest'));assert.equal(m.scope,'./');for(const i of m.icons)assert.ok(existsSync('dist/'+i.src.replace('./','')))});
+test('Android manifest has native location service and scoped lifecycle',()=>{const m=readFileSync('android/AndroidManifest.xml','utf8');assert.match(m,/foregroundServiceType="location"/);assert.match(m,/FOREGROUND_SERVICE_LOCATION/);assert.match(m,/POST_NOTIFICATIONS/);assert.doesNotMatch(m,/BOOT_COMPLETED/)});
