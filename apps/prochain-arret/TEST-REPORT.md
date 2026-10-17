@@ -10,7 +10,11 @@
 - Bouton de relance de localisation conservé entre les actualisations, avec son focus.
 - Version Android 1.2.1-pilot, versionCode 4 ; migration du cache web 1.2.0 vers 1.2.1.
 
-Validation locale : 126 tests de logique/données/cache et 80 scénarios DOM, dont 8 nouvelles régressions ; parcours DOM complet réussi. Quatre des cinq premiers nouveaux scénarios reproduisaient des défauts sur 1.2.0 avant correction. Contrastes des nouveaux états calculés entre 5,74:1 et 7,14:1. Aucune capture ni validation visuelle dans un navigateur disponible ; les règles de disposition responsive n’ont pas été inspectées sur appareil réel. Le moteur GPS et le service natif restent identiques à 1.2.0. Compilation Android et publication de ce correctif : en cours, preuves à compléter.
+Validation locale : 126 tests de logique/données/cache et 80 scénarios DOM, dont 8 nouvelles régressions ; parcours DOM complet réussi. Quatre des cinq premiers nouveaux scénarios reproduisaient des défauts sur 1.2.0 avant correction. Contrastes des nouveaux états calculés entre 5,74:1 et 7,14:1. Aucune capture ni validation visuelle dans un navigateur disponible ; les règles de disposition responsive n’ont pas été inspectées sur appareil réel. Le moteur GPS et le service natif restent identiques à 1.2.0. La compilation et les essais natifs ont réussi sur API26 et API35 : 48 assertions par environnement. CI [39053551449](https://github.com/ThithiLaCastagne/Chrono/actions/runs/39053551449), source `7039ddb4ae3d0acb31433b3f65c33b4ece510b6a`. Parité des moteurs : 453 trajectoires et 22 281 positions. La sonde Photon réussit ; Overpass refuse encore la requête HTTP406, sans bascule de contournement. Ce refus externe ne modifie pas le résultat des tests natifs.
+
+Livraison Android vérifiée : artefact API35 `12109015945`, ZIP SHA-256 `2c5bb23d0bf3fb40055fce0d90c368db1a5984bf1bcecd823f3d2f41304c3165`. APK de 75 057 octets, SHA-256 `1a05455273d036f6c4481b66a4bdeef6f327cab10a9e4d46ea1f3c8a61154560`. Les 12 ressources embarquées sont identiques aux sources locales testées.
+
+Publication 1.2.1 réussie le 17 octobre 2026 à 17:30 UTC, version Sites 4, source Sites `e1471ad9f3ead22ac6a7eb58f8709f3da3614425`. Téléchargements anonymes du JavaScript, des métadonnées et de l’APK : HTTP200, contenus identiques et empreinte APK vérifiée après publication.
 
 Les limites terrain, de disponibilité des données et de localisation souterraine du bilan 1.2 ci-dessous restent applicables.
 
